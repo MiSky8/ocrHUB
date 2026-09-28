@@ -1023,8 +1023,8 @@ def test_extract_uses_recognition_predictor(sample_image_bytes):
     fake_recognition_cls = MagicMock(return_value=MagicMock(return_value=[fake_prediction]))
     fake_detection_cls = MagicMock(return_value=MagicMock())
 
-    with patch.object(adapter, "_recognition_predictor_cls", fake_recognition_cls), patch.object(
-        adapter, "_detection_predictor_cls", fake_detection_cls
+    with patch.object(SuryaAdapter, "_recognition_predictor_cls", fake_recognition_cls), patch.object(
+        SuryaAdapter, "_detection_predictor_cls", fake_detection_cls
     ):
         result = adapter.extract(sample_image_bytes, "sample.png")
 
