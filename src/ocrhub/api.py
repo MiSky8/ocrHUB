@@ -1,6 +1,9 @@
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
+from ocrhub.adapters.ollama_adapter import OllamaAdapter
+from ocrhub.adapters.paddleocr_adapter import PaddleOcrAdapter
 from ocrhub.adapters.pdfplumber_adapter import PdfplumberAdapter
+from ocrhub.adapters.surya_adapter import SuryaAdapter
 from ocrhub.adapters.tesseract_adapter import TesseractAdapter
 from ocrhub.registry import EngineRegistry
 from ocrhub.service import process_document
@@ -10,6 +13,9 @@ def build_registry() -> EngineRegistry:
     registry = EngineRegistry()
     registry.register(PdfplumberAdapter())
     registry.register(TesseractAdapter())
+    registry.register(SuryaAdapter())
+    registry.register(PaddleOcrAdapter())
+    registry.register(OllamaAdapter())
     return registry
 
 

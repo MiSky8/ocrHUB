@@ -2,7 +2,7 @@ import io
 
 from fastapi.testclient import TestClient
 
-from ocrhub.api import create_app
+from ocrhub.api import build_registry, create_app
 from ocrhub.models import OcrResult
 from ocrhub.registry import EngineRegistry
 
@@ -52,3 +52,9 @@ def test_ocr_requires_at_least_one_engine():
     resp = client.post("/ocr", files=files, data={})
 
     assert resp.status_code == 400
+
+
+def test_build_registry_registers_all_five_engines():
+    registry = build_registry()
+    names = {adapter.name for adapter in registry.all()}
+    assert names == {"pdfplumber", "tesseract", "surya", "paddleocr", "ollama-deepseek"}
