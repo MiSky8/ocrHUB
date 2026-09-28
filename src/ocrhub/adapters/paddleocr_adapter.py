@@ -38,6 +38,9 @@ class PaddleOcrAdapter:
         for i, page_bytes in enumerate(page_images, start=1):
             img = Image.open(io.BytesIO(page_bytes)).convert("RGB")
             [lines] = engine.ocr(np.array(img), cls=True)
+            # PaddleOCR returns [None] (a single None entry, not an empty
+            # list) for a blank/textless page rather than [].
+            lines = lines or []
             texts = [entry[1][0] for entry in lines]
             confidences = [entry[1][1] for entry in lines]
             text = "\n".join(texts)

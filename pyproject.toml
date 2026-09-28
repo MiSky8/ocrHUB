@@ -23,8 +23,34 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-surya = ["surya-ocr>=0.6"]
-paddleocr = ["paddleocr>=2.7", "paddlepaddle>=2.5"]
+# Pinned: surya-ocr's 0.20+ line rewrote RecognitionPredictor around a
+# VLM inference backend (llama.cpp/vllm, requiring an external
+# llama-server binary or a GPU) with a completely different call signature
+# (no det_predictor kwarg) and no per-line confidence scores at all. 0.14.7
+# is a release on the earlier torch detection+recognition architecture that
+# matches this adapter's det_predictor-based API and TextLine.confidence
+# usage; verified working end-to-end against a real Docker build (see
+# docs/superpowers/sdd/2026-09-28-ocrhub-implementation/final-review-fix-report.md).
+# (Versions between 0.14.7 and the 0.20+ rewrite were not individually
+# checked - 0.14.7 is simply the one that was verified.)
+#
+# numpy<2 is also pinned here (and in the paddleocr extra below): when both
+# extras are installed together, paddleocr 2.7.3's own dependency pins
+# force in opencv-python==4.6.0.66 / opencv-contrib-python==4.6.0.66 (2022
+# wheels built against NumPy 1.x), which overwrite the newer
+# opencv-python-headless wheel surya-ocr pulls in in the shared `cv2`
+# import namespace. Without a numpy<2 pin, pip otherwise resolves
+# numpy>=2 (nothing else in the graph caps it), and the NumPy-1-built cv2
+# extension then fails to import under NumPy 2.x ("compiled using NumPy
+# 1.x cannot be run in NumPy 2.x").
+surya = ["surya-ocr==0.14.7", "numpy<2"]
+# Pinned: paddleocr 3.x removed the show_log/use_angle_cls constructor
+# kwargs this adapter uses and changed the .ocr()/.predict() call shape;
+# 2.7.3 + paddlepaddle 2.6.2 match the adapter's current
+# `.ocr(img, cls=True)` call and nested result parsing. See the numpy<2
+# note on the surya extra above - it applies here too (and is what
+# actually triggers the conflict, via this extra's own opencv pins).
+paddleocr = ["paddleocr==2.7.3", "paddlepaddle==2.6.2", "numpy<2"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "fpdf2>=2.7", "numpy>=1.24"]
 
 [tool.setuptools.packages.find]
