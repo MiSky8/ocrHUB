@@ -35,15 +35,46 @@ redirects on POST should target `/mcp/` directly.
 |---|---|---|---|
 | Tesseract | local, CPU | default-on | classic baseline OCR |
 | pdfplumber | local, CPU | default-on | text extraction for born-digital PDFs, not OCR |
-| Surya | local, GPU-friendly | `ENGINES=surya` | modern layout-aware OCR |
-| PaddleOCR | local, GPU-friendly | `ENGINES=paddleocr` | strong multilingual support |
-| DeepSeek (via Ollama) | self-hosted vision model | set `OLLAMA_HOST` | point at your own Ollama instance |
+| Surya | local, CPU (in-container) | `ENGINES=surya` | modern layout-aware OCR |
+| PaddleOCR | local, CPU (in-container) | `ENGINES=paddleocr` | strong multilingual support |
+| DeepSeek (via Ollama) | self-hosted vision model | set `OLLAMA_HOST` | point at your own Ollama instance, runs natively outside this container |
 
 ## Build args
 
 `ENGINES` is a comma-separated list of optional extras to install at
 build time (currently: `surya`, `paddleocr`). Tesseract and pdfplumber
 are always installed. Leave `ENGINES` unset for the smallest image.
+
+## GPU acceleration
+
+Everything running **inside** this container — Tesseract, pdfplumber,
+Surya, PaddleOCR — is CPU-only. That's true regardless of your host
+hardware, including on machines with an NVIDIA GPU: the published
+image doesn't include CUDA-enabled builds of PyTorch/PaddlePaddle, so
+a GPU present on the host isn't used by the containerized engines.
+
+On **macOS specifically**, no container can access the host GPU at
+all (Apple Silicon or Intel) — Docker Desktop on Mac runs containers
+inside a Linux VM with no Metal passthrough. This is a Docker-on-Mac
+platform limitation, not something this image can work around.
+
+The one engine that *does* get GPU acceleration on your machine is
+**Ollama/DeepSeek** — because it isn't bundled in this container at
+all. You run Ollama natively on your host (where it can use Metal on
+Mac or CUDA on Linux/Windows), and ocrHub just calls it over HTTP via
+`OLLAMA_HOST`. If you want GPU speed today, that's the path.
+
+If you're on Linux with an NVIDIA GPU and want Surya/PaddleOCR
+accelerated too, you'd need to build a variant of this image against
+CUDA-enabled PyTorch/PaddlePaddle wheels and pass `--gpus all` at
+`docker run` — not something this image does out of the box (v1 is
+intentionally CPU-only/portable), but a reasonable fast-follow if
+there's interest.
+
+Separately: `paddleocr` is pinned to `2.7.3` (not the current `3.x`)
+because `3.x` broke its API and, in testing on Apple Silicon (arm64),
+segfaulted at inference time. `2.7.3` is the last version verified
+stable in this image.
 
 ## Why
 
