@@ -55,6 +55,16 @@ def create_app(registry: EngineRegistry | None = None) -> FastAPI:
         results = await run_in_threadpool(
             process_document, registry, file_bytes, file.filename or "upload", engines
         )
-        return {"results": [vars(r) | {"pages": [vars(p) for p in r.pages]} for r in results]}
+        return {
+            "results": [
+                vars(r)
+                | {
+                    "pages": [
+                        vars(p) | {"boxes": [vars(b) for b in p.boxes]} for p in r.pages
+                    ]
+                }
+                for r in results
+            ]
+        }
 
     return app

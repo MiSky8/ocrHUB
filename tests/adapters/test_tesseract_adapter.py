@@ -22,6 +22,23 @@ def test_extract_reads_text_from_image(sample_image_bytes):
     assert len(result.pages) == 1
 
 
+def test_extract_returns_word_boxes_and_page_image(sample_image_bytes):
+    adapter = TesseractAdapter()
+    result = adapter.extract(sample_image_bytes, "sample.png")
+
+    page = result.pages[0]
+    assert page.image_base64 is not None
+    assert len(page.image_base64) > 0
+
+    assert len(page.boxes) > 0
+    words = "".join(b.text.upper() for b in page.boxes)
+    assert "OCRHUB" in words
+
+    for box in page.boxes:
+        assert box.x1 > box.x0
+        assert box.y1 > box.y0
+
+
 def test_extract_reads_text_from_scanned_pdf(sample_scanned_pdf_bytes):
     adapter = TesseractAdapter()
     result = adapter.extract(sample_scanned_pdf_bytes, "sample.pdf")

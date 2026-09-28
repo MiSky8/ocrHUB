@@ -3,6 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <title>ocrHub</title>
+  <style>
+    #results { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+    .engine-result { max-width: 480px; }
+    .page-image-wrap { position: relative; display: inline-block; max-width: 100%; }
+    .page-image-wrap img { max-width: 100%; display: block; }
+    .box-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    .box-overlay .box { fill: rgba(255, 0, 0, 0.12); stroke: red; stroke-width: 2; }
+    .page pre { white-space: pre-wrap; word-break: break-word; }
+  </style>
 </head>
 <body>
   <h1>ocrHub</h1>

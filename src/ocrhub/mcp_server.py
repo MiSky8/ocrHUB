@@ -15,7 +15,17 @@ def build_mcp_server(registry: EngineRegistry) -> MCPServer:
         """Run one or more OCR engines over a base64-encoded document and return normalized results."""
         file_bytes = base64.b64decode(file_base64)
         results = process_document(registry, file_bytes, filename, engines)
-        return {"results": [vars(r) | {"pages": [vars(p) for p in r.pages]} for r in results]}
+        return {
+            "results": [
+                vars(r)
+                | {
+                    "pages": [
+                        vars(p) | {"boxes": None, "image_base64": None} for p in r.pages
+                    ]
+                }
+                for r in results
+            ]
+        }
 
     return mcp
 

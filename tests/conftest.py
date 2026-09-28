@@ -1,6 +1,6 @@
 import io
 
-import fitz  # PyMuPDF
+import pymupdf as fitz
 import pytest
 from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont
