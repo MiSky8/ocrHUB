@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ocrhub"
+version = "0.1.0"
+description = "One Docker image, many OCR engines, one API."
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "pydantic>=2.6",
+    "pytesseract>=0.3.10",
+    "Pillow>=10.0",
+    "pdfplumber>=0.11",
+    "pymupdf>=1.24",
+    "httpx>=0.27",
+    "mcp>=1.0",
+]
+
+[project.optional-dependencies]
+surya = ["surya-ocr>=0.6"]
+paddleocr = ["paddleocr>=2.7", "paddlepaddle>=2.5"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "fpdf2>=2.7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
