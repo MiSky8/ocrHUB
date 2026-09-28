@@ -25,7 +25,7 @@ dependencies = [
 [project.optional-dependencies]
 surya = ["surya-ocr>=0.6"]
 paddleocr = ["paddleocr>=2.7", "paddlepaddle>=2.5"]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "fpdf2>=2.7"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "fpdf2>=2.7", "numpy>=1.24"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
