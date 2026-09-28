@@ -9,7 +9,8 @@ comparison into something you can run in one command.
 
 ```bash
 docker build --build-arg ENGINES=surya,paddleocr -t ocrhub .
-docker run -p 8000:8000 -e OLLAMA_HOST=http://host.docker.internal:11434 ocrhub
+docker run -p 8000:8000 -e OLLAMA_HOST=http://host.docker.internal:11434 \
+  -v ocrhub-models:/root/.cache ocrhub
 ```
 
 Open `http://localhost:8000` to upload a document and compare engines
@@ -44,6 +45,20 @@ redirects on POST should target `/mcp/` directly.
 `ENGINES` is a comma-separated list of optional extras to install at
 build time (currently: `surya`, `paddleocr`). Tesseract and pdfplumber
 are always installed. Leave `ENGINES` unset for the smallest image.
+
+## Persistent model cache
+
+Surya and PaddleOCR download their model weights on first use (not
+baked into the image, to keep the base build small) — Surya's
+recognition model alone is ~1.6GB. Both cache under `/root/.cache`
+inside the container. Without a mounted volume, that cache is lost
+every time the container is removed or recreated, so you'll re-pay
+that download on every fresh `docker run`.
+
+Mount a named volume to persist it across runs, as shown in the
+Quickstart above (`-v ocrhub-models:/root/.cache`) — the second and
+subsequent runs then start these engines instantly instead of
+re-downloading their weights.
 
 ## GPU acceleration
 
