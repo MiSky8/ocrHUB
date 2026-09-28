@@ -9,7 +9,14 @@ class EngineRegistry:
         self._adapters[adapter.name] = adapter
 
     def available_engines(self) -> list[str]:
-        return [name for name, adapter in self._adapters.items() if adapter.available()]
+        available = []
+        for name, adapter in self._adapters.items():
+            try:
+                if adapter.available():
+                    available.append(name)
+            except Exception:  # noqa: BLE001 - per-engine isolation is the point
+                continue
+        return available
 
     def get(self, name: str) -> OcrAdapter:
         return self._adapters[name]

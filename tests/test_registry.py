@@ -16,10 +16,31 @@ class FakeAdapter:
         return OcrResult(engine=self.name, text="fake", elapsed_ms=1)
 
 
+class BrokenAdapter:
+    """An adapter whose available() raises instead of returning a bool."""
+
+    def __init__(self, name: str):
+        self.name = name
+
+    def available(self) -> bool:
+        raise RuntimeError("broken engine probe")
+
+    def extract(self, file_bytes: bytes, filename: str) -> OcrResult:
+        return OcrResult(engine=self.name, text="fake", elapsed_ms=1)
+
+
 def test_available_engines_only_lists_available_adapters():
     registry = EngineRegistry()
     registry.register(FakeAdapter("on", is_available=True))
     registry.register(FakeAdapter("off", is_available=False))
+
+    assert registry.available_engines() == ["on"]
+
+
+def test_available_engines_excludes_adapter_whose_available_raises():
+    registry = EngineRegistry()
+    registry.register(FakeAdapter("on", is_available=True))
+    registry.register(BrokenAdapter("broken"))
 
     assert registry.available_engines() == ["on"]
 

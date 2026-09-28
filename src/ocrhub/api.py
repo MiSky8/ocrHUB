@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -51,7 +52,9 @@ def create_app(registry: EngineRegistry | None = None) -> FastAPI:
             raise HTTPException(status_code=400, detail="at least one engine is required")
 
         file_bytes = await file.read()
-        results = process_document(registry, file_bytes, file.filename or "upload", engines)
+        results = await run_in_threadpool(
+            process_document, registry, file_bytes, file.filename or "upload", engines
+        )
         return {"results": [vars(r) | {"pages": [vars(p) for p in r.pages]} for r in results]}
 
     return app
