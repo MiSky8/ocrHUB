@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ocrHub</title>
+</head>
+<body>
+  <h1>ocrHub</h1>
+  <p>Upload a document, pick engines, compare results.</p>
+
+  <form id="ocr-form">
+    <input type="file" id="file-input" name="file" required />
+    <fieldset id="engine-list">
+      <legend>Engines</legend>
+    </fieldset>
+    <button type="submit">Run OCR</button>
+  </form>
+
+  <div id="results"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
