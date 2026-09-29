@@ -105,6 +105,25 @@ processed. Pass `refresh=true` as a form field on `/ocr` (or the MCP
 tool's `refresh` argument) to force recomputation. A failed result is
 never cached, so a transient error doesn't permanently poison it.
 
+## Batch processing
+
+There's no separate batch API - `/ocr` (and the MCP `ocr_document` tool)
+already take one file per call, and that's enough to process a whole
+folder: loop over it yourself. Every result still lands in the persistent
+store above, so re-running the same loop after a partial failure only
+recomputes what's missing.
+
+```bash
+for f in ~/my-dataset/*; do
+  curl -s -F "file=@$f" -F "engines=tesseract" -F "engines=surya" \
+    http://localhost:8000/ocr | jq -c '.results[] | {engine, ok, elapsed_ms}'
+done
+```
+
+Or, since `ocr_document` is exposed over MCP, an MCP-capable agent (e.g.
+Claude) can drive it directly - point it at a local folder and ask it to
+OCR every file with the engines you want, no script required.
+
 ## GPU acceleration
 
 Everything running **inside** this container — Tesseract, pdfplumber,
