@@ -74,9 +74,10 @@ def create_app(registry: EngineRegistry | None = None, store: ResultStore | None
             "results": [
                 vars(r)
                 | {
+                    "ok": r.ok,
                     "pages": [
                         vars(p) | {"boxes": [vars(b) for b in p.boxes]} for p in r.pages
-                    ]
+                    ],
                 }
                 for r in results
             ]

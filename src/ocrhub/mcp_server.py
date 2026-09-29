@@ -23,9 +23,10 @@ def build_mcp_server(registry: EngineRegistry, store: ResultStore | None = None)
             "results": [
                 vars(r)
                 | {
+                    "ok": r.ok,
                     "pages": [
                         vars(p) | {"boxes": None, "image_base64": None} for p in r.pages
-                    ]
+                    ],
                 }
                 for r in results
             ]
