@@ -111,15 +111,21 @@ function toggleShow(key) {
 function renderResultsGrid() {
   const grid = document.getElementById("results-grid");
   grid.innerHTML = "";
-  const names = Array.from(state.compare).filter((n) => state.results[n] && state.results[n].ok);
-  if (names.length === 0) return;
+  const allNames = Array.from(state.compare);
+  if (allNames.length === 0) return;
 
   if (state.layoutMode === "side-by-side") {
     grid.style.display = "grid";
     grid.style.gap = "16px";
-    grid.style.gridTemplateColumns = `repeat(${names.length}, minmax(0, 1fr))`;
-    names.forEach((name) => grid.appendChild(renderPanel(name, state.results[name])));
+    grid.style.gridTemplateColumns = `repeat(${allNames.length}, minmax(0, 1fr))`;
+    allNames.forEach((name) => {
+      const result = state.results[name];
+      if (!result) return;
+      grid.appendChild(renderPanel(name, result));
+    });
   } else {
+    const names = allNames.filter((n) => state.results[n] && state.results[n].ok);
+    if (names.length === 0) return;
     grid.style.display = "block";
     grid.appendChild(renderOverlayPanel(names));
   }
@@ -301,21 +307,6 @@ function handleFileChosen(file) {
 document.addEventListener("DOMContentLoaded", () => {
   state.show = { boxes: true, text: true, orderNumbers: true };
 
-  document.getElementById("results-grid").insertAdjacentHTML("beforebegin", `
-    <div class="toolbar">
-      <div class="mode-switch" role="group" aria-label="Layout">
-        <button type="button" id="mode-side-by-side" class="mode-btn active">Side by side</button>
-        <button type="button" id="mode-overlay" class="mode-btn">Overlay</button>
-      </div>
-      <div class="toolbar-divider"></div>
-      <div class="sidebar-label">Show</div>
-      <div class="show-toggles">
-        <button type="button" id="toggle-boxes" class="show-toggle active">Boxes</button>
-        <button type="button" id="toggle-text" class="show-toggle active">Text</button>
-        <button type="button" id="toggle-order" class="show-toggle active">Order numbers</button>
-      </div>
-    </div>
-  `);
   document.getElementById("mode-side-by-side").addEventListener("click", () => setLayoutMode("side-by-side"));
   document.getElementById("mode-overlay").addEventListener("click", () => setLayoutMode("overlay"));
   document.getElementById("toggle-boxes").addEventListener("click", () => toggleShow("boxes"));
