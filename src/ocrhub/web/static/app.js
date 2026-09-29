@@ -13,6 +13,7 @@ const state = {
   results: {},
   compare: new Set(),
 };
+state.layoutMode = "side-by-side";
 
 async function loadEngines() {
   const resp = await fetch("/engines");
@@ -94,19 +95,95 @@ function toggleCompare(name) {
   renderResultsGrid();
 }
 
+function setLayoutMode(mode) {
+  state.layoutMode = mode;
+  document.getElementById("mode-side-by-side").classList.toggle("active", mode === "side-by-side");
+  document.getElementById("mode-overlay").classList.toggle("active", mode === "overlay");
+  renderResultsGrid();
+}
+
+function toggleShow(key) {
+  state.show[key] = !state.show[key];
+  document.getElementById(`toggle-${key === "orderNumbers" ? "order" : key}`).classList.toggle("active", state.show[key]);
+  renderResultsGrid();
+}
+
 function renderResultsGrid() {
   const grid = document.getElementById("results-grid");
   grid.innerHTML = "";
-  grid.style.display = "grid";
-  grid.style.gap = "16px";
-  const names = Array.from(state.compare);
-  grid.style.gridTemplateColumns = `repeat(${Math.max(1, names.length)}, minmax(0, 1fr))`;
+  const names = Array.from(state.compare).filter((n) => state.results[n] && state.results[n].ok);
+  if (names.length === 0) return;
 
+  if (state.layoutMode === "side-by-side") {
+    grid.style.display = "grid";
+    grid.style.gap = "16px";
+    grid.style.gridTemplateColumns = `repeat(${names.length}, minmax(0, 1fr))`;
+    names.forEach((name) => grid.appendChild(renderPanel(name, state.results[name])));
+  } else {
+    grid.style.display = "block";
+    grid.appendChild(renderOverlayPanel(names));
+  }
+}
+
+function renderOverlayPanel(names) {
+  const panel = document.createElement("section");
+  panel.className = "engine-panel";
+
+  const header = document.createElement("div");
+  header.className = "panel-header";
   names.forEach((name) => {
-    const result = state.results[name];
-    if (!result) return;
-    grid.appendChild(renderPanel(name, result));
+    const chip = document.createElement("span");
+    chip.style.cssText = `display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;margin-right:12px;`;
+    chip.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${ENGINE_COLORS[name] || "#999"}"></span>${name}`;
+    header.appendChild(chip);
   });
+  panel.appendChild(header);
+
+  // Canonical image: first engine (in `names` order) whose first page has an image.
+  const canonicalName = names.find((n) => state.results[n].pages[0].image_base64);
+  if (!canonicalName) return panel;
+  const canonicalPage = state.results[canonicalName].pages[0];
+
+  const wrap = document.createElement("div");
+  wrap.className = "page-image-wrap";
+  const img = document.createElement("img");
+  img.src = `data:image/png;base64,${canonicalPage.image_base64}`;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.classList.add("box-overlay");
+
+  img.addEventListener("load", () => {
+    svg.setAttribute("viewBox", `0 0 ${img.naturalWidth} ${img.naturalHeight}`);
+    const canonicalW = img.naturalWidth, canonicalH = img.naturalHeight;
+
+    names.forEach((name) => {
+      const page = state.results[name].pages[0];
+      let scaleX = 1, scaleY = 1;
+      if (page.image_base64 && name !== canonicalName) {
+        // Measure this engine's own image dimensions before scaling its boxes.
+        const probe = new Image();
+        probe.onload = () => {
+          scaleX = canonicalW / probe.naturalWidth;
+          scaleY = canonicalH / probe.naturalHeight;
+          drawBoxes(svg, scaleBoxes(page.boxes, scaleX, scaleY), ENGINE_COLORS[name] || "#999");
+        };
+        probe.src = `data:image/png;base64,${page.image_base64}`;
+      } else {
+        drawBoxes(svg, page.boxes, ENGINE_COLORS[name] || "#999");
+      }
+    });
+  });
+
+  wrap.appendChild(img);
+  wrap.appendChild(svg);
+  panel.appendChild(wrap);
+  return panel;
+}
+
+function scaleBoxes(boxes, scaleX, scaleY) {
+  return boxes.map((b) => ({
+    ...b,
+    x0: b.x0 * scaleX, y0: b.y0 * scaleY, x1: b.x1 * scaleX, y1: b.y1 * scaleY,
+  }));
 }
 
 function renderPanel(name, result) {
@@ -223,6 +300,28 @@ function handleFileChosen(file) {
 
 document.addEventListener("DOMContentLoaded", () => {
   state.show = { boxes: true, text: true, orderNumbers: true };
+
+  document.getElementById("results-grid").insertAdjacentHTML("beforebegin", `
+    <div class="toolbar">
+      <div class="mode-switch" role="group" aria-label="Layout">
+        <button type="button" id="mode-side-by-side" class="mode-btn active">Side by side</button>
+        <button type="button" id="mode-overlay" class="mode-btn">Overlay</button>
+      </div>
+      <div class="toolbar-divider"></div>
+      <div class="sidebar-label">Show</div>
+      <div class="show-toggles">
+        <button type="button" id="toggle-boxes" class="show-toggle active">Boxes</button>
+        <button type="button" id="toggle-text" class="show-toggle active">Text</button>
+        <button type="button" id="toggle-order" class="show-toggle active">Order numbers</button>
+      </div>
+    </div>
+  `);
+  document.getElementById("mode-side-by-side").addEventListener("click", () => setLayoutMode("side-by-side"));
+  document.getElementById("mode-overlay").addEventListener("click", () => setLayoutMode("overlay"));
+  document.getElementById("toggle-boxes").addEventListener("click", () => toggleShow("boxes"));
+  document.getElementById("toggle-text").addEventListener("click", () => toggleShow("text"));
+  document.getElementById("toggle-order").addEventListener("click", () => toggleShow("orderNumbers"));
+
   loadEngines();
   document.getElementById("file-input").addEventListener("change", (e) => {
     if (e.target.files[0]) handleFileChosen(e.target.files[0]);

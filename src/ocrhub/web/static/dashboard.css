@@ -242,6 +242,62 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
   height: 100%;
 }
 
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.mode-switch {
+  display: flex;
+  padding: 3px;
+  gap: 3px;
+  background: var(--toggle-track);
+  border-radius: 9px;
+}
+
+.mode-btn {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  background: transparent;
+  color: var(--text);
+}
+
+.mode-btn.active {
+  background: #ffffff;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--divider);
+}
+
+.show-toggles {
+  display: flex;
+  gap: 6px;
+}
+
+.show-toggle {
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--input-border);
+  background: transparent;
+  color: #3a3733;
+}
+
+.show-toggle.active {
+  border-color: var(--dark-bg);
+  background: var(--dark-bg);
+  color: var(--dark-fg);
+}
+
 .box-order-badge {
   box-sizing: border-box;
   width: 15px;
