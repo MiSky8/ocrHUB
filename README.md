@@ -63,8 +63,9 @@ redirects on POST should target `/mcp/` directly.
 ## Build args
 
 `ENGINES` is a comma-separated list of optional extras to install at
-build time (currently: `surya`, `paddleocr`). Tesseract and pdfplumber
-are always installed. Leave `ENGINES` unset for the smallest image.
+build time (currently: `surya`, `paddleocr`, `datalab`). Tesseract and
+pdfplumber are always installed. Leave `ENGINES` unset for the smallest
+image.
 
 ## Persistent model cache
 
@@ -79,6 +80,30 @@ Mount a named volume to persist it across runs, as shown in the
 Quickstart above (`-v ocrhub-models:/home/ocrhub/.cache`) — the second and
 subsequent runs then start these engines instantly instead of
 re-downloading their weights.
+
+## Persistent input/output storage
+
+Every `/ocr` request saves the uploaded file and each engine's result to
+`/home/ocrhub/data` inside the container, under a directory named after
+the SHA-256 hash of the file's contents:
+
+```
+data/input/<hash>-<original-filename>
+data/output/<hash>/_meta.json          # original filename, timestamp
+data/output/<hash>/<engine>.json       # that engine's OcrResult
+```
+
+If you use `docker compose` (recommended, see Quickstart), this is
+already mounted as the `ocrhub-data` volume - no extra setup needed. With
+plain `docker run`, add `-v ocrhub-data:/home/ocrhub/data`.
+
+This is also the result cache: if the same file's hash already has a
+saved result for a given engine, `/ocr` returns it instead of re-running
+that engine - useful for anything slow (Surya, PaddleOCR, a paid Datalab
+call) where you don't want to re-pay the cost on a file you already
+processed. Pass `refresh=true` as a form field on `/ocr` (or the MCP
+tool's `refresh` argument) to force recomputation. A failed result is
+never cached, so a transient error doesn't permanently poison it.
 
 ## GPU acceleration
 
