@@ -1,9 +1,10 @@
+import base64
 import io
 import time
 
 from PIL import Image
 
-from ocrhub.models import OcrResult, PageResult
+from ocrhub.models import BoxResult, OcrResult, PageResult
 from ocrhub.pdf_utils import is_pdf, rasterize_pdf
 
 
@@ -45,10 +46,38 @@ class SuryaAdapter:
         for i, page_bytes in enumerate(page_images, start=1):
             img = Image.open(io.BytesIO(page_bytes))
             [prediction] = recognition_predictor([img], det_predictor=detection_predictor)
+
+            boxes: list[BoxResult] = []
+            for line in prediction.text_lines:
+                x0, y0, x1, y1 = line.bbox
+                boxes.append(
+                    BoxResult(
+                        text=line.text,
+                        x0=float(x0),
+                        y0=float(y0),
+                        x1=float(x1),
+                        y1=float(y1),
+                        confidence=line.confidence * 100 if line.confidence is not None else None,
+                    )
+                )
+
             text = "\n".join(line.text for line in prediction.text_lines)
             confidences = [line.confidence for line in prediction.text_lines if line.confidence is not None]
             page_confidence = sum(confidences) / len(confidences) if confidences else None
-            pages.append(PageResult(page_number=i, text=text, confidence=page_confidence))
+
+            png_buf = io.BytesIO()
+            img.convert("RGB").save(png_buf, format="PNG")
+            image_base64 = base64.b64encode(png_buf.getvalue()).decode("ascii")
+
+            pages.append(
+                PageResult(
+                    page_number=i,
+                    text=text,
+                    confidence=page_confidence,
+                    boxes=boxes,
+                    image_base64=image_base64,
+                )
+            )
 
         elapsed_ms = int((time.monotonic() - start) * 1000)
         full_text = "\n".join(p.text for p in pages)
