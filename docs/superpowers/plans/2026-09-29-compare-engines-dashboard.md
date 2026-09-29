@@ -1062,6 +1062,10 @@ git commit -m "feat: overlay comparison mode and Boxes/Text/Order-numbers toggle
 **Files:**
 - Modify: `src/ocrhub/web/static/app.js`
 - Modify: `src/ocrhub/web/static/dashboard.css`
+- Modify: `src/ocrhub/web/templates/index.html` (the Detections markup below is page
+  structure, not JS-generated content — add it as static HTML in the template, in the
+  same place Tasks 3/4/5 added their own markup, matching the pattern Task 5 was
+  corrected to use after its own plan omitted `index.html` the same way)
 
 **Interfaces:**
 - Consumes: `state.results`, `state.compare`.
