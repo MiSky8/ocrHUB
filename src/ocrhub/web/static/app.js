@@ -14,6 +14,7 @@ const state = {
   compare: new Set(),
 };
 state.layoutMode = "side-by-side";
+state.detectionsTab = null;
 
 async function loadEngines() {
   const resp = await fetch("/engines");
@@ -112,23 +113,101 @@ function renderResultsGrid() {
   const grid = document.getElementById("results-grid");
   grid.innerHTML = "";
   const allNames = Array.from(state.compare);
-  if (allNames.length === 0) return;
 
-  if (state.layoutMode === "side-by-side") {
-    grid.style.display = "grid";
-    grid.style.gap = "16px";
-    grid.style.gridTemplateColumns = `repeat(${allNames.length}, minmax(0, 1fr))`;
-    allNames.forEach((name) => {
-      const result = state.results[name];
-      if (!result) return;
-      grid.appendChild(renderPanel(name, result));
-    });
-  } else {
-    const names = allNames.filter((n) => state.results[n] && state.results[n].ok);
-    if (names.length === 0) return;
-    grid.style.display = "block";
-    grid.appendChild(renderOverlayPanel(names));
+  if (allNames.length > 0) {
+    if (state.layoutMode === "side-by-side") {
+      grid.style.display = "grid";
+      grid.style.gap = "16px";
+      grid.style.gridTemplateColumns = `repeat(${allNames.length}, minmax(0, 1fr))`;
+      allNames.forEach((name) => {
+        const result = state.results[name];
+        if (!result) return;
+        grid.appendChild(renderPanel(name, result));
+      });
+    } else {
+      const names = allNames.filter((n) => state.results[n] && state.results[n].ok);
+      if (names.length > 0) {
+        grid.style.display = "block";
+        grid.appendChild(renderOverlayPanel(names));
+      }
+    }
   }
+  renderDetections();
+}
+
+function renderDetections() {
+  const tabsEl = document.getElementById("detections-tabs");
+  const rowsEl = document.getElementById("detections-rows");
+  tabsEl.innerHTML = "";
+  rowsEl.innerHTML = "";
+
+  const names = Array.from(state.compare).filter((n) => state.results[n] && state.results[n].ok);
+  if (names.length === 0) return;
+  if (!state.detectionsTab || !names.includes(state.detectionsTab)) {
+    state.detectionsTab = names[0];
+  }
+
+  names.forEach((name) => {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = "detections-tab" + (name === state.detectionsTab ? " active" : "");
+    const dot = `<span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${ENGINE_COLORS[name] || "#999"}"></span>`;
+    tab.innerHTML = `${dot} ${name}`;
+    tab.addEventListener("click", () => { state.detectionsTab = name; renderDetections(); });
+    tabsEl.appendChild(tab);
+  });
+
+  const page = state.results[state.detectionsTab].pages[0];
+  const allOrdered = page.boxes.length > 0 && page.boxes.every((b) => b.reading_order !== null && b.reading_order !== undefined);
+  const rows = allOrdered
+    ? [...page.boxes].sort((a, b) => a.reading_order - b.reading_order)
+    : page.boxes;
+
+  rows.forEach((box, i) => {
+    const row = document.createElement("div");
+    row.className = "detections-row";
+    row.style.background = i % 2 ? "var(--row-alt)" : "#fff";
+
+    const order = document.createElement("div");
+    order.style.fontWeight = "600";
+    order.textContent = box.reading_order !== null && box.reading_order !== undefined ? box.reading_order : "–";
+
+    const text = document.createElement("div");
+    text.style.cssText = "white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+    text.textContent = box.text;
+    text.title = box.text;
+
+    const conf = document.createElement("div");
+    if (box.confidence !== null && box.confidence !== undefined) {
+      const pct = Math.round(box.confidence);
+      const barWrap = document.createElement("div");
+      barWrap.style.cssText = "display:flex;align-items:center;gap:8px;";
+      const bar = document.createElement("div");
+      bar.className = "conf-bar";
+      const fill = document.createElement("div");
+      fill.className = "conf-bar-fill";
+      fill.style.width = Math.round(34 * (pct / 100)) + "px";
+      fill.style.background = pct >= 70 ? "var(--success)" : "var(--warn)";
+      bar.appendChild(fill);
+      barWrap.appendChild(bar);
+      const span = document.createElement("span");
+      span.textContent = pct + "%";
+      barWrap.appendChild(span);
+      conf.appendChild(barWrap);
+    } else {
+      conf.textContent = "–";
+    }
+
+    const bbox = document.createElement("div");
+    bbox.style.color = "var(--muted-2)";
+    bbox.textContent = `${Math.round(box.x0)}, ${Math.round(box.y0)}, ${Math.round(box.x1 - box.x0)}, ${Math.round(box.y1 - box.y0)}`;
+
+    row.appendChild(order);
+    row.appendChild(text);
+    row.appendChild(conf);
+    row.appendChild(bbox);
+    rowsEl.appendChild(row);
+  });
 }
 
 function renderOverlayPanel(names) {
