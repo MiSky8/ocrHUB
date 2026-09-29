@@ -54,7 +54,14 @@ def test_ocr_requires_at_least_one_engine():
     assert resp.status_code == 400
 
 
-def test_build_registry_registers_all_five_engines():
+def test_build_registry_registers_all_six_engines():
     registry = build_registry()
     names = {adapter.name for adapter in registry.all()}
-    assert names == {"pdfplumber", "tesseract", "surya", "paddleocr", "ollama-deepseek"}
+    assert names == {
+        "pdfplumber",
+        "tesseract",
+        "surya",
+        "paddleocr",
+        "ollama-deepseek",
+        "datalab",
+    }

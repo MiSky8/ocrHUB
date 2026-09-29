@@ -51,6 +51,10 @@ surya = ["surya-ocr==0.14.7", "numpy<2"]
 # note on the surya extra above - it applies here too (and is what
 # actually triggers the conflict, via this extra's own opencv pins).
 paddleocr = ["paddleocr==2.7.3", "paddlepaddle==2.6.2", "numpy<2"]
+# brotlicffi: Datalab's API responses are Brotli-encoded; the SDK's aiohttp
+# client needs this to decompress them (see agentVLM/pyproject.toml, which
+# vendors the same datalab_sdk usage this adapter is based on).
+datalab = ["datalab-python-sdk>=0.5", "brotlicffi>=1.0"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "fpdf2>=2.7", "numpy>=1.24"]
 
 [tool.setuptools.packages.find]

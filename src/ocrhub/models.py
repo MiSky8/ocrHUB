@@ -9,6 +9,8 @@ class BoxResult:
     x1: float
     y1: float
     confidence: float | None = None
+    reading_order: int | None = None
+    region_type: str | None = None
 
 
 @dataclass
