@@ -10,7 +10,7 @@ comparison into something you can run in one command.
 ```bash
 docker build --build-arg ENGINES=surya,paddleocr -t ocrhub .
 docker run -p 8000:8000 -e OLLAMA_HOST=http://host.docker.internal:11434 \
-  -v ocrhub-models:/root/.cache ocrhub
+  -v ocrhub-models:/home/ocrhub/.cache ocrhub
 ```
 
 Open `http://localhost:8000` to upload a document and compare engines
@@ -50,13 +50,13 @@ are always installed. Leave `ENGINES` unset for the smallest image.
 
 Surya and PaddleOCR download their model weights on first use (not
 baked into the image, to keep the base build small) — Surya's
-recognition model alone is ~1.6GB. Both cache under `/root/.cache`
+recognition model alone is ~1.6GB. Both cache under `/home/ocrhub/.cache`
 inside the container. Without a mounted volume, that cache is lost
 every time the container is removed or recreated, so you'll re-pay
 that download on every fresh `docker run`.
 
 Mount a named volume to persist it across runs, as shown in the
-Quickstart above (`-v ocrhub-models:/root/.cache`) — the second and
+Quickstart above (`-v ocrhub-models:/home/ocrhub/.cache`) — the second and
 subsequent runs then start these engines instantly instead of
 re-downloading their weights.
 
