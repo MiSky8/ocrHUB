@@ -3,29 +3,49 @@
 <head>
   <meta charset="UTF-8" />
   <title>ocrHub</title>
-  <style>
-    #results { display: flex; flex-wrap: wrap; gap: 1.5rem; }
-    .engine-result { max-width: 480px; }
-    .page-image-wrap { position: relative; display: inline-block; max-width: 100%; }
-    .page-image-wrap img { max-width: 100%; display: block; }
-    .box-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-    .box-overlay .box { fill: rgba(255, 0, 0, 0.12); stroke: red; stroke-width: 2; }
-    .page pre { white-space: pre-wrap; word-break: break-word; }
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="/static/dashboard.css">
 </head>
 <body>
-  <h1>ocrHub</h1>
-  <p>Upload a document, pick engines, compare results.</p>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo-box"></div>
+        <div>ocrHub</div>
+      </div>
 
-  <form id="ocr-form">
-    <input type="file" id="file-input" name="file" required />
-    <fieldset id="engine-list">
-      <legend>Engines</legend>
-    </fieldset>
-    <button type="submit">Run OCR</button>
-  </form>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Input</div>
+        <label class="upload-dropzone">
+          <input type="file" id="file-input" style="display:none" />
+          <span>Drop an image or click to upload</span>
+        </label>
+        <div id="file-chip" class="file-chip" hidden>
+          <div class="file-thumb"></div>
+          <div>
+            <div id="file-name" class="mono"></div>
+            <div id="file-meta"></div>
+          </div>
+        </div>
+      </div>
 
-  <div id="results"></div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Engines</div>
+        <div id="engine-list"></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="main-header">
+        <h1>Compare engines</h1>
+        <div style="flex-grow:1"></div>
+        <button type="button" id="run-all-btn" class="run-all-btn">Run all engines</button>
+      </div>
+
+      <div id="results-grid"></div>
+    </main>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

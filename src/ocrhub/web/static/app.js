@@ -1,91 +1,76 @@
+const ENGINE_COLORS = {
+  tesseract: "#1f5fa8",
+  surya: "#b04a06",
+  paddleocr: "#6b3fa0",
+  datalab: "#2f7d4f",
+  "ollama-deepseek": "#a7a195",
+};
+
+const state = {
+  engines: [],
+  selected: new Set(),
+  file: null,
+};
+
 async function loadEngines() {
   const resp = await fetch("/engines");
   const data = await resp.json();
+  state.engines = data.engines;
+  renderEngineList();
+}
+
+function renderEngineList() {
+  // NOTE: `.engine-row` is a <div>, not a <button> — Task 4 adds a second,
+  // separate "Compare" <button> inside this row once that engine has a
+  // result, and HTML forbids nesting <button> inside <button>. The row's
+  // own select/deselect behavior lives on `.engine-select-btn` below.
   const container = document.getElementById("engine-list");
-  data.engines.forEach((name) => {
-    const label = document.createElement("label");
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.name = "engines";
-    checkbox.value = name;
-    label.appendChild(checkbox);
-    label.append(` ${name}`);
-    container.appendChild(label);
+  container.innerHTML = "";
+  state.engines.forEach((name) => {
+    const row = document.createElement("div");
+    row.className = "engine-row";
+
+    const selectBtn = document.createElement("button");
+    selectBtn.type = "button";
+    selectBtn.className = "engine-select-btn";
+    selectBtn.setAttribute("aria-pressed", state.selected.has(name));
+
+    const box = document.createElement("div");
+    box.className = "engine-checkbox";
+    box.style.setProperty("--_engine-color", ENGINE_COLORS[name] || "#999");
+    box.style.background = state.selected.has(name) ? (ENGINE_COLORS[name] || "#999") : "transparent";
+
+    const label = document.createElement("span");
+    label.textContent = name;
+
+    selectBtn.appendChild(box);
+    selectBtn.appendChild(label);
+    selectBtn.addEventListener("click", () => toggleEngine(name));
+    row.appendChild(selectBtn);
+    container.appendChild(row);
   });
 }
 
-function renderPage(page) {
-  const pageDiv = document.createElement("div");
-  pageDiv.className = "page";
-
-  if (page.image_base64) {
-    const wrap = document.createElement("div");
-    wrap.className = "page-image-wrap";
-
-    const img = document.createElement("img");
-    img.src = `data:image/png;base64,${page.image_base64}`;
-
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.classList.add("box-overlay");
-
-    img.addEventListener("load", () => {
-      svg.setAttribute("viewBox", `0 0 ${img.naturalWidth} ${img.naturalHeight}`);
-      (page.boxes || []).forEach((box) => {
-        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        rect.setAttribute("x", box.x0);
-        rect.setAttribute("y", box.y0);
-        rect.setAttribute("width", box.x1 - box.x0);
-        rect.setAttribute("height", box.y1 - box.y0);
-        rect.setAttribute("class", "box");
-        const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
-        title.textContent = box.text;
-        rect.appendChild(title);
-        svg.appendChild(rect);
-      });
-    });
-
-    wrap.appendChild(img);
-    wrap.appendChild(svg);
-    pageDiv.appendChild(wrap);
+function toggleEngine(name) {
+  if (state.selected.has(name)) {
+    state.selected.delete(name);
+  } else {
+    state.selected.add(name);
   }
-
-  const pre = document.createElement("pre");
-  pre.textContent = page.text;
-  pageDiv.appendChild(pre);
-
-  return pageDiv;
+  renderEngineList();
 }
 
-async function runOcr(event) {
-  event.preventDefault();
-  const form = document.getElementById("ocr-form");
-  const formData = new FormData(form);
-  const resp = await fetch("/ocr", { method: "POST", body: formData });
-  const data = await resp.json();
-
-  const resultsDiv = document.getElementById("results");
-  resultsDiv.innerHTML = "";
-  data.results.forEach((result) => {
-    const block = document.createElement("div");
-    block.className = "engine-result";
-
-    const heading = document.createElement("h3");
-    heading.textContent = `${result.engine} (${result.elapsed_ms}ms)`;
-    block.appendChild(heading);
-
-    if (result.error) {
-      const err = document.createElement("pre");
-      err.textContent = result.error;
-      block.appendChild(err);
-    } else {
-      (result.pages || []).forEach((page) => block.appendChild(renderPage(page)));
-    }
-
-    resultsDiv.appendChild(block);
-  });
+function handleFileChosen(file) {
+  state.file = file;
+  const chip = document.getElementById("file-chip");
+  const nameEl = document.getElementById("file-name");
+  chip.hidden = false;
+  nameEl.textContent = file.name;
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   loadEngines();
-  document.getElementById("ocr-form").addEventListener("submit", runOcr);
+  document.getElementById("file-input").addEventListener("change", (e) => {
+    if (e.target.files[0]) handleFileChosen(e.target.files[0]);
+  });
 });
