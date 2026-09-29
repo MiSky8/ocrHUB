@@ -459,7 +459,8 @@ Load the same Google Fonts the mockup uses, in `index.html`'s `<head>`:
 - `.sidebar-label`: `font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);`
 - `.upload-dropzone`: `display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 12px; border: 1.5px dashed var(--input-border); border-radius: 10px; background: transparent; color: #3a3733; font-size: 13px; line-height: 1.4; text-align: center; width: 100%; box-sizing: border-box;`
 - `.file-chip`: `display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px;`
-- `.engine-row`: `display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); text-align: left; width: 100%; box-sizing: border-box;`
+- `.engine-row`: `display: flex; align-items: center; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); box-sizing: border-box;` (plain container `<div>` — holds `.engine-select-btn` and, once Task 4 adds it, a `.compare-toggle-btn`)
+- `.engine-select-btn`: `display: flex; align-items: center; gap: 12px; flex-grow: 1; min-width: 0; border: 0; background: transparent; color: var(--text); text-align: left; padding: 0;`
 - `.engine-checkbox`: `width: 18px; height: 18px; box-sizing: border-box; flex-shrink: 0; border-radius: 4px; border: 1.5px solid var(--_engine-color, #999); display: flex; align-items: center; justify-content: center;` — set `--_engine-color` inline per row from a JS-assigned engine color (see Task 4's `ENGINE_COLORS` map).
 - `.main`: `flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 24px 28px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;`
 - `.main-header`: `display: flex; align-items: center; gap: 16px;` with an `<h1>` at `font-size: 24px; font-weight: 600; letter-spacing: -0.015em; margin: 0;` reading "Compare engines"
@@ -547,13 +548,20 @@ async function loadEngines() {
 }
 
 function renderEngineList() {
+  // NOTE: `.engine-row` is a <div>, not a <button> — Task 4 adds a second,
+  // separate "Compare" <button> inside this row once that engine has a
+  // result, and HTML forbids nesting <button> inside <button>. The row's
+  // own select/deselect behavior lives on `.engine-select-btn` below.
   const container = document.getElementById("engine-list");
   container.innerHTML = "";
   state.engines.forEach((name) => {
-    const row = document.createElement("button");
-    row.type = "button";
+    const row = document.createElement("div");
     row.className = "engine-row";
-    row.setAttribute("aria-pressed", state.selected.has(name));
+
+    const selectBtn = document.createElement("button");
+    selectBtn.type = "button";
+    selectBtn.className = "engine-select-btn";
+    selectBtn.setAttribute("aria-pressed", state.selected.has(name));
 
     const box = document.createElement("div");
     box.className = "engine-checkbox";
@@ -563,9 +571,10 @@ function renderEngineList() {
     const label = document.createElement("span");
     label.textContent = name;
 
-    row.appendChild(box);
-    row.appendChild(label);
-    row.addEventListener("click", () => toggleEngine(name));
+    selectBtn.appendChild(box);
+    selectBtn.appendChild(label);
+    selectBtn.addEventListener("click", () => toggleEngine(name));
+    row.appendChild(selectBtn);
     container.appendChild(row);
   });
 }
@@ -670,7 +679,23 @@ git commit -m "feat: dashboard shell — sidebar, engine list, upload"
 
 **Behavior:**
 - Clicking "Run all engines" (or a new per-run trigger) calls `POST /ocr` once with every `state.selected` engine, then stores each result in `state.results` keyed by engine name.
-- A result becomes available for comparison display once it's returned; add a small "Compare" toggle next to each engine's sidebar row (visible only once that engine has a result) that adds/removes it from `state.compare`. If `state.compare` already has 3 engines and a 4th is toggled on, **do not add it** — this is the "max 3 shown at once" rule from the Global Constraints. (Running stays unlimited — this cap only affects `state.compare`, never `state.selected`.)
+- A result becomes available for comparison display once it's returned. Modify Task 3's `renderEngineList()` (defined in `src/ocrhub/web/static/app.js`, the `.engine-row` div) to append a "Compare" button — `.compare-toggle-btn` — after `.engine-select-btn`, but **only** when `state.results[name]` exists:
+
+```javascript
+// Insert into renderEngineList()'s per-engine loop, after `row.appendChild(selectBtn);`:
+if (state.results[name]) {
+  const compareBtn = document.createElement("button");
+  compareBtn.type = "button";
+  compareBtn.className = "compare-toggle-btn" + (state.compare.has(name) ? " active" : "");
+  compareBtn.textContent = "Compare";
+  compareBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleCompare(name); });
+  row.appendChild(compareBtn);
+}
+```
+
+`.compare-toggle-btn` CSS: `padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 500; border: 1px solid var(--input-border); background: transparent; color: #3a3733; flex-shrink: 0;` — `.active`: `border-color: var(--dark-bg); background: var(--dark-bg); color: var(--dark-fg);`.
+
+`toggleCompare(name)` (defined below) adds/removes `name` from `state.compare`. If `state.compare` already has 3 engines and a 4th is toggled on, **do not add it** — this is the "max 3 shown at once" rule from the Global Constraints. (Running stays unlimited — this cap only affects `state.compare`, never `state.selected`.) After `runAll()` populates `state.results`, it must call `renderEngineList()` again (not just `renderResultsGrid()`) so the newly-available Compare buttons actually appear — add this call explicitly in `runAll()`.
 - `#results-grid` renders one panel per engine in `state.compare`, `display: grid; grid-template-columns: repeat(N, minmax(0, 1fr)); gap: 16px;` where N is `state.compare.size` (1, 2, or 3 columns).
 - Each panel (`.engine-panel` — `box-sizing: border-box; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px;`) shows: a header row with the engine's colored square (10×10px, `border-radius: 3px`, `background: <engine color>`) + name at `font-size: 14px; font-weight: 600;`, and stats (`box count · confidence% · elapsed ms`) at `font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--muted-2);` — then the page image with an absolutely-positioned SVG box overlay, same technique already proven for the single-engine Tesseract view (`viewBox` set to the image's natural dimensions on load, so box coordinates need no manual scaling math).
 - Box color per engine comes from `ENGINE_COLORS` (already defined in Task 3). Box style: `fill: <color>22` (hex + `22` alpha suffix), `stroke: <color>`, `stroke-width: 1.5`.
@@ -1168,7 +1193,25 @@ function renderDetections() {
 }
 ```
 
-Call `renderDetections()` at the end of `renderResultsGrid()` (append the call after its existing body from Task 4/5) so the table always reflects the current `state.compare` set.
+Task 5's `renderResultsGrid()` has an early `if (names.length === 0) return;` before its side-by-side/overlay branches — calling `renderDetections()` only after that function's existing final line would skip it whenever `names` is empty (leaving a stale Detections table visible with no matching comparison panels). Fix this by replacing that early return with a guard around the render logic instead, so there's one exit point that always calls `renderDetections()`:
+
+```javascript
+// Replace the `if (names.length === 0) return;` line and everything below
+// it in renderResultsGrid with:
+if (names.length > 0) {
+  if (state.layoutMode === "side-by-side") {
+    grid.style.display = "grid";
+    grid.style.gridTemplateColumns = `repeat(${names.length}, minmax(0, 1fr))`;
+    names.forEach((name) => grid.appendChild(renderPanel(name, state.results[name])));
+  } else {
+    grid.style.display = "block";
+    grid.appendChild(renderOverlayPanel(names));
+  }
+}
+renderDetections();
+```
+
+`renderDetections()` already handles the empty case correctly on its own (it clears `tabsEl`/`rowsEl` before its own early return), so calling it unconditionally here is safe and keeps the table in sync with `state.compare` in every case, including when the comparison set is empty.
 
 - [ ] **Step 3: Run the full pytest suite**
 
