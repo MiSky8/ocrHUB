@@ -5,16 +5,20 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from ocrhub.registry import EngineRegistry
 from ocrhub.service import process_document
+from ocrhub.storage import ResultStore, build_store
 
 
-def build_mcp_server(registry: EngineRegistry) -> MCPServer:
+def build_mcp_server(registry: EngineRegistry, store: ResultStore | None = None) -> MCPServer:
     mcp = MCPServer("ocrhub")
+    store = store or build_store()
 
     @mcp.tool()
-    def ocr_document(file_base64: str, filename: str, engines: list[str]) -> dict:
+    def ocr_document(
+        file_base64: str, filename: str, engines: list[str], refresh: bool = False
+    ) -> dict:
         """Run one or more OCR engines over a base64-encoded document and return normalized results."""
         file_bytes = base64.b64decode(file_base64)
-        results = process_document(registry, file_bytes, filename, engines)
+        results = process_document(registry, file_bytes, filename, engines, store, refresh)
         return {
             "results": [
                 vars(r)
@@ -30,7 +34,7 @@ def build_mcp_server(registry: EngineRegistry) -> MCPServer:
     return mcp
 
 
-def mcp_asgi_app(registry: EngineRegistry):
+def mcp_asgi_app(registry: EngineRegistry, store: ResultStore | None = None):
     # streamable_http_path="/": the app is mounted at "/mcp" by main.py, and the
     # SDK's own default path is also "/mcp", which would otherwise stack into
     # "/mcp/mcp". Serving at the sub-app's root makes the mounted path exactly
@@ -49,7 +53,7 @@ def mcp_asgi_app(registry: EngineRegistry):
     # non-loopback deployment (see TransportSecurityMiddleware.__init__,
     # which disables protection "by default for backwards compatibility"
     # when no settings are supplied) rather than opening a new hole.
-    return build_mcp_server(registry).streamable_http_app(
+    return build_mcp_server(registry, store).streamable_http_app(
         streamable_http_path="/",
         transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
     )

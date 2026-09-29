@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from ocrhub.api import build_registry, create_app
 from ocrhub.models import OcrResult
 from ocrhub.registry import EngineRegistry
+from ocrhub.storage import ResultStore
 
 
 class StubAdapter:
@@ -17,26 +18,26 @@ class StubAdapter:
         return OcrResult(engine=self.name, text="stub text", elapsed_ms=1)
 
 
-def _client() -> TestClient:
+def _client(tmp_path) -> TestClient:
     registry = EngineRegistry()
     registry.register(StubAdapter())
-    return TestClient(create_app(registry))
+    return TestClient(create_app(registry, ResultStore(tmp_path)))
 
 
-def test_health():
-    resp = _client().get("/health")
+def test_health(tmp_path):
+    resp = _client(tmp_path).get("/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
 
 
-def test_engines_lists_available_only():
-    resp = _client().get("/engines")
+def test_engines_lists_available_only(tmp_path):
+    resp = _client(tmp_path).get("/engines")
     assert resp.status_code == 200
     assert resp.json() == {"engines": ["stub"]}
 
 
-def test_ocr_runs_requested_engine():
-    client = _client()
+def test_ocr_runs_requested_engine(tmp_path):
+    client = _client(tmp_path)
     files = {"file": ("f.png", io.BytesIO(b"fake-bytes"), "image/png")}
     resp = client.post("/ocr", files=files, data={"engines": ["stub"]})
 
@@ -46,8 +47,8 @@ def test_ocr_runs_requested_engine():
     assert body["results"][0]["text"] == "stub text"
 
 
-def test_ocr_requires_at_least_one_engine():
-    client = _client()
+def test_ocr_requires_at_least_one_engine(tmp_path):
+    client = _client(tmp_path)
     files = {"file": ("f.png", io.BytesIO(b"fake-bytes"), "image/png")}
     resp = client.post("/ocr", files=files, data={})
 

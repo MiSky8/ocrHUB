@@ -14,6 +14,7 @@ from ocrhub.adapters.surya_adapter import SuryaAdapter
 from ocrhub.adapters.tesseract_adapter import TesseractAdapter
 from ocrhub.registry import EngineRegistry
 from ocrhub.service import process_document
+from ocrhub.storage import ResultStore, build_store
 
 WEB_DIR = Path(__file__).parent / "web"
 templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
@@ -30,10 +31,12 @@ def build_registry() -> EngineRegistry:
     return registry
 
 
-def create_app(registry: EngineRegistry | None = None) -> FastAPI:
+def create_app(registry: EngineRegistry | None = None, store: ResultStore | None = None) -> FastAPI:
     registry = registry or build_registry()
+    store = store or build_store()
     app = FastAPI(title="ocrHub")
     app.state.registry = registry
+    app.state.store = store
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
 
     @app.get("/", response_class=HTMLResponse)
@@ -49,13 +52,23 @@ def create_app(registry: EngineRegistry | None = None) -> FastAPI:
         return {"engines": registry.available_engines()}
 
     @app.post("/ocr")
-    async def ocr(file: UploadFile = File(...), engines: list[str] = Form(default=[])) -> dict:
+    async def ocr(
+        file: UploadFile = File(...),
+        engines: list[str] = Form(default=[]),
+        refresh: bool = Form(default=False),
+    ) -> dict:
         if not engines:
             raise HTTPException(status_code=400, detail="at least one engine is required")
 
         file_bytes = await file.read()
         results = await run_in_threadpool(
-            process_document, registry, file_bytes, file.filename or "upload", engines
+            process_document,
+            registry,
+            file_bytes,
+            file.filename or "upload",
+            engines,
+            store,
+            refresh,
         )
         return {
             "results": [

@@ -19,6 +19,11 @@ services:
     volumes:
       # Persists downloaded Surya/PaddleOCR model weights across restarts.
       - ocrhub-models:/home/ocrhub/.cache
+      # Persists uploaded files and every engine's OCR output as JSON,
+      # keyed by content hash - also doubles as the result cache (same
+      # file + engine skips recomputation; see /ocr's `refresh` field).
+      - ocrhub-data:/home/ocrhub/data
 
 volumes:
   ocrhub-models:
+  ocrhub-data:

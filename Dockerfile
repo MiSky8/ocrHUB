@@ -20,7 +20,8 @@ RUN pip install --no-cache-dir --upgrade pip \
        fi
 
 RUN useradd --create-home --shell /bin/bash ocrhub \
-    && chown -R ocrhub:ocrhub /app
+    && mkdir -p /home/ocrhub/.cache /home/ocrhub/data \
+    && chown -R ocrhub:ocrhub /app /home/ocrhub
 USER ocrhub
 
 EXPOSE 8000

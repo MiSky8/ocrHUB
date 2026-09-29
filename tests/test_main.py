@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 
-def test_app_starts_and_serves_health_and_mcp_through_composed_lifespan():
+def test_app_starts_and_serves_health_and_mcp_through_composed_lifespan(tmp_path, monkeypatch):
     """Regression test for Task 15's lifespan composition (mounting the MCP
     sub-app's own TaskGroup-based lifespan into the outer app's lifespan).
 
@@ -25,6 +25,7 @@ def test_app_starts_and_serves_health_and_mcp_through_composed_lifespan():
     against the same module-level `app` raises "run() can only be called
     once per instance."
     """
+    monkeypatch.setenv("OCRHUB_DATA_DIR", str(tmp_path))
     from ocrhub.main import app
 
     init_request = {

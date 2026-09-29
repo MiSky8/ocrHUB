@@ -4,10 +4,12 @@ import uvicorn
 
 from ocrhub.api import build_registry, create_app
 from ocrhub.mcp_server import mcp_asgi_app
+from ocrhub.storage import build_store
 
 registry = build_registry()
-app = create_app(registry)
-mcp_app = mcp_asgi_app(registry)
+store = build_store()
+app = create_app(registry, store)
+mcp_app = mcp_asgi_app(registry, store)
 
 # The MCP streamable-HTTP sub-app starts a TaskGroup inside its own lifespan
 # (see StreamableHTTPSessionManager.run()). Starlette does not propagate

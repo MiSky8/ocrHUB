@@ -6,6 +6,7 @@ import pytest
 from ocrhub.mcp_server import build_mcp_server
 from ocrhub.models import OcrResult
 from ocrhub.registry import EngineRegistry
+from ocrhub.storage import ResultStore
 
 
 class StubAdapter:
@@ -20,10 +21,10 @@ class StubAdapter:
 
 
 @pytest.mark.asyncio
-async def test_ocr_document_tool_decodes_and_runs_engine():
+async def test_ocr_document_tool_decodes_and_runs_engine(tmp_path):
     registry = EngineRegistry()
     registry.register(StubAdapter())
-    server = build_mcp_server(registry)
+    server = build_mcp_server(registry, ResultStore(tmp_path))
 
     call_result = await server.call_tool(
         "ocr_document",
