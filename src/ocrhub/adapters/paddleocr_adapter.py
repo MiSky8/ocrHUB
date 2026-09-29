@@ -1,9 +1,10 @@
+import base64
 import io
 import time
 
 from PIL import Image
 
-from ocrhub.models import OcrResult, PageResult
+from ocrhub.models import BoxResult, OcrResult, PageResult
 from ocrhub.pdf_utils import is_pdf, rasterize_pdf
 
 
@@ -41,11 +42,41 @@ class PaddleOcrAdapter:
             # PaddleOCR returns [None] (a single None entry, not an empty
             # list) for a blank/textless page rather than [].
             lines = lines or []
+
+            boxes: list[BoxResult] = []
+            for entry in lines:
+                polygon, (text, confidence) = entry
+                xs = [pt[0] for pt in polygon]
+                ys = [pt[1] for pt in polygon]
+                boxes.append(
+                    BoxResult(
+                        text=text,
+                        x0=float(min(xs)),
+                        y0=float(min(ys)),
+                        x1=float(max(xs)),
+                        y1=float(max(ys)),
+                        confidence=confidence * 100,
+                    )
+                )
+
             texts = [entry[1][0] for entry in lines]
             confidences = [entry[1][1] for entry in lines]
             text = "\n".join(texts)
             confidence = sum(confidences) / len(confidences) if confidences else None
-            pages.append(PageResult(page_number=i, text=text, confidence=confidence))
+
+            png_buf = io.BytesIO()
+            img.save(png_buf, format="PNG")
+            image_base64 = base64.b64encode(png_buf.getvalue()).decode("ascii")
+
+            pages.append(
+                PageResult(
+                    page_number=i,
+                    text=text,
+                    confidence=confidence,
+                    boxes=boxes,
+                    image_base64=image_base64,
+                )
+            )
 
         elapsed_ms = int((time.monotonic() - start) * 1000)
         full_text = "\n".join(p.text for p in pages)

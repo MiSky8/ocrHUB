@@ -40,3 +40,25 @@ def test_extract_handles_blank_page_none_result(sample_image_bytes):
     assert result.ok is True
     assert result.text == ""
     assert result.pages[0].confidence is None
+
+
+def test_extract_returns_boxes_and_page_image(sample_image_bytes):
+    adapter = PaddleOcrAdapter()
+
+    fake_result = [[[[[10, 20], [110, 20], [110, 50], [10, 50]], ("OCRHUB TEST", 0.88)]]]
+    fake_engine = MagicMock()
+    fake_engine.ocr.return_value = fake_result
+
+    with patch.object(adapter, "_build_engine", return_value=fake_engine):
+        result = adapter.extract(sample_image_bytes, "sample.png")
+
+    page = result.pages[0]
+    assert page.image_base64 is not None
+    assert len(page.image_base64) > 0
+
+    assert len(page.boxes) == 1
+    box = page.boxes[0]
+    assert box.text == "OCRHUB TEST"
+    assert (box.x0, box.y0, box.x1, box.y1) == (10.0, 20.0, 110.0, 50.0)
+    assert box.confidence == pytest.approx(88.0)
+    assert box.reading_order is None
