@@ -7,9 +7,28 @@ comparison into something you can run in one command.
 
 ## Quickstart
 
+**One config file, one command** (recommended): copy `.env.example` to
+`.env`, edit it to pick which engines to build (`ENGINES=`) and set any
+runtime config (`OLLAMA_HOST`, `DATALAB_API_KEY`, ...), then:
+
 ```bash
-docker build --build-arg ENGINES=surya,paddleocr -t ocrhub .
-docker run -p 8000:8000 -e OLLAMA_HOST=http://host.docker.internal:11434 \
+cp .env.example .env   # edit .env to taste
+docker compose up --build
+```
+
+`.env` is gitignored - it's yours to edit locally, `.env.example` is the
+tracked template. Re-run `docker compose up --build` any time you change
+`ENGINES` in `.env`; a plain `docker compose up` picks up changes to the
+other (runtime-only) variables without rebuilding.
+
+**Plain `docker build`/`docker run`** works too, if you'd rather not use
+Compose - `ENGINES` is a build arg, everything else is a runtime `-e`:
+
+```bash
+docker build --build-arg ENGINES=surya,paddleocr,datalab -t ocrhub .
+docker run -p 8000:8000 \
+  -e OLLAMA_HOST=http://host.docker.internal:11434 \
+  -e DATALAB_API_KEY=your-key-here \
   -v ocrhub-models:/home/ocrhub/.cache ocrhub
 ```
 
@@ -39,6 +58,7 @@ redirects on POST should target `/mcp/` directly.
 | Surya | local, CPU (in-container) | `ENGINES=surya` | modern layout-aware OCR |
 | PaddleOCR | local, CPU (in-container) | `ENGINES=paddleocr` | strong multilingual support |
 | DeepSeek (via Ollama) | self-hosted vision model | set `OLLAMA_HOST` | point at your own Ollama instance, runs natively outside this container |
+| Datalab | hosted API | `ENGINES=datalab` + set `DATALAB_API_KEY` | paid, has a free monthly tier - see [datalab.to](https://www.datalab.to) |
 
 ## Build args
 
