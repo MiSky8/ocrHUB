@@ -7,7 +7,16 @@ comparison into something you can run in one command.
 
 ## Quickstart
 
-**One config file, one command** (recommended): copy `.env.example` to
+**Fastest way** - from this folder, with Docker running:
+
+```bash
+docker compose up --build
+```
+
+Then open <http://localhost:8000>. Stop it with `Ctrl+C`. (This builds the
+smallest image: tesseract + pdfplumber only. To add more engines, see below.)
+
+**One config file, one command:** copy `.env.example` to
 `.env`, edit it to pick which engines to build (`ENGINES=`) and set any
 runtime config (`OLLAMA_HOST`, `DATALAB_API_KEY`, ...), then:
 
@@ -157,21 +166,12 @@ stable in this image.
 
 ## Running the tests
 
-The test suite needs Python 3.11+ and no Docker, GPU, model downloads or
-API keys: OCR engines are mocked, so it runs in a couple of seconds.
-
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest -q
 ```
 
-Run a single file with `pytest tests/test_api.py -q`, or a single test with
-`pytest tests/test_api.py -k ok_false -q`.
-
-The dashboard's JavaScript (`src/ocrhub/web/static/app.js`) has no automated
-tests. To check it, run the app (see Quickstart), open
-`http://localhost:8000`, upload an image, and select two or more engines.
+Engines are mocked, so no Docker or downloads are needed.
 
 ## Why
 
