@@ -221,6 +221,15 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
   height: auto;
 }
 
+.page-image-wrap.ocr-only {
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--border, #ddd);
+}
+
+.page-image-wrap.ocr-only img {
+  opacity: 0;
+}
+
 .box-overlay {
   position: absolute;
   top: 0;

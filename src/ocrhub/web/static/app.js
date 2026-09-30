@@ -543,7 +543,7 @@ function renderPanel(name, result) {
 
 function renderPageWithBoxes(page, engineName) {
   const wrap = document.createElement("div");
-  wrap.className = "page-image-wrap";
+  wrap.className = "page-image-wrap ocr-only";
   if (!page.image_base64) return wrap;
 
   const img = document.createElement("img");
@@ -554,7 +554,7 @@ function renderPageWithBoxes(page, engineName) {
 
   img.addEventListener("load", () => {
     svg.setAttribute("viewBox", `0 0 ${img.naturalWidth} ${img.naturalHeight}`);
-    drawBoxes(svg, page.boxes, ENGINE_COLORS[engineName] || "#999");
+    drawBoxes(svg, page.boxes, ENGINE_COLORS[engineName] || "#999", true);
   });
 
   wrap.appendChild(img);
@@ -562,7 +562,9 @@ function renderPageWithBoxes(page, engineName) {
   return wrap;
 }
 
-function drawBoxes(svg, boxes, color) {
+// inPlace: draw the OCR text at each box's position on a blank page (the
+// page image is hidden), instead of a small label under the box.
+function drawBoxes(svg, boxes, color, inPlace = false) {
   if (!state.show.boxes && !state.show.text && !state.show.orderNumbers) return;
   boxes.forEach((box) => {
     const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -579,7 +581,19 @@ function drawBoxes(svg, boxes, color) {
       g.appendChild(rect);
     }
 
-    if (state.show.text) {
+    if (state.show.text && inPlace) {
+      const h = box.y1 - box.y0;
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      t.setAttribute("x", box.x0);
+      t.setAttribute("y", box.y1 - h * 0.2);
+      t.setAttribute("font-size", Math.max(h * 0.85, 6));
+      t.setAttribute("textLength", Math.max(box.x1 - box.x0, 1));
+      t.setAttribute("lengthAdjust", "spacingAndGlyphs");
+      t.setAttribute("fill", "#111");
+      t.setAttribute("font-family", "system-ui, sans-serif");
+      t.textContent = box.text;
+      g.appendChild(t);
+    } else if (state.show.text) {
       const label = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
       label.setAttribute("x", box.x0 - 1);
       label.setAttribute("y", box.y1 + 1);
