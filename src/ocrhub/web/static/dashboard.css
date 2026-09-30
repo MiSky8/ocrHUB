@@ -208,7 +208,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 
 .page-image-wrap {
   position: relative;
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
   margin: 0 auto;
 }
@@ -216,8 +216,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .page-image-wrap img {
   display: block;
   max-width: 100%;
-  max-height: var(--page-max-h, 60vh);
-  width: auto;
+  width: 100%;
   height: auto;
 }
 
@@ -459,7 +458,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 
 .results-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
   gap: 16px;
   align-items: start;
 }
@@ -471,7 +470,6 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .blank-page {
   display: block;
   width: 100%;
-  max-height: var(--page-max-h, 60vh);
   background: #fff;
 }
 

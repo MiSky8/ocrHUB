@@ -593,17 +593,40 @@ function drawBoxes(svg, boxes, color, inPlace = false) {
     }
 
     if (state.show.text && inPlace) {
+      const w = Math.max(box.x1 - box.x0, 1);
       const h = box.y1 - box.y0;
-      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      t.setAttribute("x", box.x0);
-      t.setAttribute("y", box.y1 - h * 0.2);
-      t.setAttribute("font-size", Math.max(h * 0.85, 6));
-      t.setAttribute("textLength", Math.max(box.x1 - box.x0, 1));
-      t.setAttribute("lengthAdjust", "spacingAndGlyphs");
-      t.setAttribute("fill", "#111");
-      t.setAttribute("font-family", "system-ui, sans-serif");
-      t.textContent = box.text;
-      g.appendChild(t);
+      const n = (box.text || "").length;
+      // Largest font where the text, wrapped to the box width, fits its height
+      // (average glyph is ~0.6em wide, lines are 1.25em tall).
+      let f = Math.max(h * 0.85, 6);
+      let lines = Math.ceil((n * 0.6 * f) / w);
+      while (lines > 1 && f > 6 && lines * f * 1.25 > h) {
+        f -= 1;
+        lines = Math.ceil((n * 0.6 * f) / w);
+      }
+      if (lines <= 1) {
+        const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        t.setAttribute("x", box.x0);
+        t.setAttribute("y", box.y1 - h * 0.2);
+        t.setAttribute("font-size", f);
+        t.setAttribute("textLength", w);
+        t.setAttribute("lengthAdjust", "spacingAndGlyphs");
+        t.setAttribute("fill", "#111");
+        t.setAttribute("font-family", "system-ui, sans-serif");
+        t.textContent = box.text;
+        g.appendChild(t);
+      } else {
+        const fo = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
+        fo.setAttribute("x", box.x0);
+        fo.setAttribute("y", box.y0);
+        fo.setAttribute("width", w);
+        fo.setAttribute("height", h);
+        const div = document.createElement("div");
+        div.style.cssText = `font:${f}px/1.25 system-ui,sans-serif;color:#111;overflow:hidden;height:${h}px;overflow-wrap:anywhere;`;
+        div.textContent = box.text;
+        fo.appendChild(div);
+        g.appendChild(fo);
+      }
     } else if (state.show.text) {
       const label = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
       label.setAttribute("x", box.x0 - 1);
