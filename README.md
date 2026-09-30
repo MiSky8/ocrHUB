@@ -16,6 +16,16 @@ docker compose up --build
 Then open <http://localhost:8000>. Stop it with `Ctrl+C`. (This builds the
 smallest image: tesseract + pdfplumber only. To add more engines, see below.)
 
+To see what the app is doing (engine progress, errors, model downloads),
+open a second terminal in this folder and run:
+
+```bash
+docker compose logs -f
+```
+
+If the page looks wrong after an update, rebuild with
+`docker compose up --build` and hard-refresh the browser (Cmd+Shift+R).
+
 **One config file, one command:** copy `.env.example` to
 `.env`, edit it to pick which engines to build (`ENGINES=`) and set any
 runtime config (`OLLAMA_HOST`, `DATALAB_API_KEY`, ...), then:

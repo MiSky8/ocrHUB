@@ -15,6 +15,8 @@ const state = {
 };
 state.layoutMode = "side-by-side";
 state.detectionsTab = null;
+state.running = new Set();
+let runTimer = null;
 
 async function loadEngines() {
   const resp = await fetch("/engines");
@@ -88,6 +90,15 @@ async function runAll() {
   btn.disabled = true;
   btn.textContent = "Running…";
   setRunStatus("", false);
+  const startedAt = Date.now();
+  state.running = new Set(state.selected);
+  const tick = () => {
+    const secs = Math.round((Date.now() - startedAt) / 1000);
+    setRunStatus(`Running ${Array.from(state.running).join(", ")}… ${secs}s`, false);
+    renderResultsGrid();
+  };
+  tick();
+  runTimer = setInterval(tick, 1000);
   try {
     const formData = new FormData();
     formData.append("file", state.file);
@@ -106,10 +117,13 @@ async function runAll() {
       if (r.ok && state.compare.size < 3) state.compare.add(r.engine);
     });
     renderEngineList();
-    renderResultsGrid();
+    setRunStatus("", false);
   } catch (e) {
     setRunStatus(e && e.message ? e.message : "Request failed.", true);
   } finally {
+    clearInterval(runTimer);
+    state.running = new Set();
+    renderResultsGrid();
     btn.disabled = false;
     btn.textContent = label;
   }
@@ -137,11 +151,51 @@ function toggleShow(key) {
   renderResultsGrid();
 }
 
+function renderRunningCard(name) {
+  const card = document.createElement("div");
+  card.className = "engine-panel running-card";
+  const header = document.createElement("div");
+  header.className = "panel-header";
+  header.appendChild(colorDot(name, 10));
+  header.appendChild(document.createTextNode(` ${name}`));
+  const body = document.createElement("div");
+  body.className = "running-body";
+  const spinner = document.createElement("span");
+  spinner.className = "spinner";
+  body.appendChild(spinner);
+  body.appendChild(document.createTextNode(" Running…"));
+  card.appendChild(header);
+  card.appendChild(body);
+  return card;
+}
+
 function renderResultsGrid() {
   const grid = document.getElementById("results-grid");
   grid.innerHTML = "";
   const allNames = Array.from(state.compare);
 
+  if (state.running.size > 0) {
+    grid.style.display = "grid";
+    grid.style.gap = "16px";
+    grid.style.gridTemplateColumns = "repeat(auto-fit, minmax(240px, 1fr))";
+    state.running.forEach((name) => grid.appendChild(renderRunningCard(name)));
+    renderDetections();
+    return;
+  }
+  if (allNames.length === 0) {
+    grid.style.display = "block";
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    const hasResults = Object.keys(state.results).length > 0;
+    empty.textContent = !state.file
+      ? "Upload an image, tick the engines you want, then press Run all engines."
+      : hasResults
+        ? "Press Compare next to an engine (up to 3) to see its result here."
+        : "Tick the engines you want, then press Run all engines. Slow engines such as Surya can take a minute or more.";
+    grid.appendChild(empty);
+    renderDetections();
+    return;
+  }
   if (allNames.length > 0) {
     if (state.layoutMode === "side-by-side") {
       grid.style.display = "grid";
@@ -451,6 +505,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("toggle-order").addEventListener("click", () => toggleShow("orderNumbers"));
 
   loadEngines();
+  renderResultsGrid();
   document.getElementById("file-input").addEventListener("change", (e) => {
     if (e.target.files[0]) handleFileChosen(e.target.files[0]);
   });

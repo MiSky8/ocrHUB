@@ -422,3 +422,37 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
   height: 5px;
   border-radius: 3px;
 }
+
+.file-chip[hidden] { display: none; }
+
+.empty-state {
+  padding: 48px 24px;
+  text-align: center;
+  color: #5b574f;
+  font-size: 14px;
+  border: 1px dashed #d4d0c6;
+  border-radius: 12px;
+}
+
+.running-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  padding: 56px 16px;
+  color: #5b574f;
+  font-size: 14px;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #d4d0c6;
+  border-top-color: #1a1815;
+  border-radius: 50%;
+  animation: ocrhub-spin 0.8s linear infinite;
+}
+
+@keyframes ocrhub-spin { to { transform: rotate(360deg); } }
+
+.running-card .panel-header { gap: 6px; }
