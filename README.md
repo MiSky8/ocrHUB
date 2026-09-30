@@ -133,10 +133,15 @@ data/output/<hash>/<engine>.json       # that engine's OcrResult
 ```
 
 Each `<engine>.json` holds the extracted text, and per page the boxes
-(coordinates, reading order, region type). Extras by engine: Datalab boxes
-keep the original `html` (lists, tables), and the file has a `raw` field with
-Datalab's untouched response; pdfplumber boxes carry the PDF's real font
-name, size, bold and italic in `style`.
+(coordinates, reading order, region type). Extras by engine:
+
+- **Datalab:** boxes keep the original `html` (lists, tables), and the file has
+  a `raw` field with Datalab's untouched response.
+- **pdfplumber:** one box per text line with the PDF's real font in `style`
+  (font, size, bold, italic, colour, and per-run styles); detected tables are
+  `Table` boxes with `html`.
+- **Tesseract:** one box per line, with the individual words (and their
+  confidences) nested in `words`; page confidence is the mean word confidence.
 
 With plain `docker run`, add `-v "$PWD/data:/home/ocrhub/data"`. On a Linux
 host the folder must be writable by uid 1000 (the container's `ocrhub` user);

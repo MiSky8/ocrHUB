@@ -566,11 +566,13 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 }
 
 /* Engine-supplied markup (Datalab) drawn in place on the blank page. */
-.ocr-html { font-family: system-ui, sans-serif; line-height: 1.25; color: #111; overflow: hidden; }
+.ocr-html { font-family: system-ui, sans-serif; color: #111; overflow: visible; white-space: normal; }
 .ocr-html > * { margin: 0; }
 .ocr-html p, .ocr-html h1, .ocr-html h2, .ocr-html h3 { margin: 0; font-size: inherit; }
 .ocr-html ul, .ocr-html ol { margin: 0; padding-left: 1.4em; }
 .ocr-html li.has-marker { list-style: none; margin-left: -1.4em; }
-.ocr-html table { border-collapse: collapse; width: 100%; }
+.ocr-html table { border-collapse: collapse; width: 100%; height: 100%; }
+.ocr-html td[align=right], .ocr-html th[align=right] { text-align: right; }
+.ocr-html td[align=center], .ocr-html th[align=center] { text-align: center; }
 .ocr-html td, .ocr-html th { border: 1px solid #c8c8c8; padding: 0.15em 0.4em; text-align: left; }
 .ocr-html th { font-weight: 600; }

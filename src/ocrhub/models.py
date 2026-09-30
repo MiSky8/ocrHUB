@@ -17,6 +17,8 @@ class BoxResult:
     # Font info for engines that read a PDF's text layer (pdfplumber):
     # {"font": str, "size": float, "bold": bool, "italic": bool}.
     style: dict | None = None
+    # Per-word boxes nested in a line box (Tesseract): text, x0..y1, confidence.
+    words: list[dict] | None = None
 
 
 @dataclass

@@ -30,35 +30,59 @@ class TesseractAdapter:
             img = Image.open(io.BytesIO(page_bytes))
             data = pytesseract.image_to_data(img, output_type=Output.DICT)
 
-            boxes: list[BoxResult] = []
-            lines: dict[tuple[int, int, int], list[str]] = {}
+            # Tesseract reports words tagged with block/paragraph/line numbers, in
+            # reading order. Group them into one box per line (comparable to the
+            # other engines) and keep the words, with their confidences, nested.
+            lines: dict[tuple[int, int, int], list[dict]] = {}
             for j, word in enumerate(data["text"]):
                 if not word.strip():
                     continue
-                line_key = (data["block_num"][j], data["par_num"][j], data["line_num"][j])
-                lines.setdefault(line_key, []).append(word)
-
+                key = (data["block_num"][j], data["par_num"][j], data["line_num"][j])
                 left, top = data["left"][j], data["top"][j]
-                width, height = data["width"][j], data["height"][j]
                 conf = data["conf"][j]
+                lines.setdefault(key, []).append(
+                    {
+                        "text": word,
+                        "x0": float(left),
+                        "y0": float(top),
+                        "x1": float(left + data["width"][j]),
+                        "y1": float(top + data["height"][j]),
+                        "confidence": float(conf) if conf != -1 else None,
+                    }
+                )
+
+            boxes: list[BoxResult] = []
+            all_confs: list[float] = []
+            for order, words in enumerate(lines.values()):
+                confs = [w["confidence"] for w in words if w["confidence"] is not None]
+                all_confs.extend(confs)
                 boxes.append(
                     BoxResult(
-                        text=word,
-                        x0=float(left),
-                        y0=float(top),
-                        x1=float(left + width),
-                        y1=float(top + height),
-                        confidence=float(conf) if conf != -1 else None,
+                        text=" ".join(w["text"] for w in words),
+                        x0=min(w["x0"] for w in words),
+                        y0=min(w["y0"] for w in words),
+                        x1=max(w["x1"] for w in words),
+                        y1=max(w["y1"] for w in words),
+                        confidence=sum(confs) / len(confs) if confs else None,
+                        reading_order=order,
+                        words=words,
                     )
                 )
-            text = "\n".join(" ".join(words) for words in lines.values())
+            text = "\n".join(box.text for box in boxes)
+            page_confidence = sum(all_confs) / len(all_confs) if all_confs else None
 
             png_buf = io.BytesIO()
             img.convert("RGB").save(png_buf, format="PNG")
             image_base64 = base64.b64encode(png_buf.getvalue()).decode("ascii")
 
             pages.append(
-                PageResult(page_number=i, text=text, boxes=boxes, image_base64=image_base64)
+                PageResult(
+                    page_number=i,
+                    text=text,
+                    confidence=page_confidence,
+                    boxes=boxes,
+                    image_base64=image_base64,
+                )
             )
 
         elapsed_ms = int((time.monotonic() - start) * 1000)

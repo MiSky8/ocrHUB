@@ -576,8 +576,8 @@ function renderPageWithBoxes(page, engineName) {
 
 
 // Average glyph is ~0.6em wide; lines are 1.25em tall.
-function countWrappedLines(textLines, size, width) {
-  return textLines.reduce((sum, t) => sum + Math.max(1, Math.ceil((t.length * 0.6 * size) / width)), 0);
+function countWrappedLines(textLines, size, width, glyph = 0.6) {
+  return textLines.reduce((sum, t) => sum + Math.max(1, Math.ceil((t.length * glyph * size) / width)), 0);
 }
 
 // Largest font where the box's text, wrapped to the box width, fits its height.
@@ -594,14 +594,42 @@ function fitFont(box) {
   return f;
 }
 
-// Body text size for a page: the median fitted size of its plain text blocks,
-// so tables and lists (which have no size of their own) match the paragraphs.
+// Datalab boxes are tight around their text: a single line is ~1.1x the font
+// size tall, and each extra line adds ~1.75x (font plus leading). Solve that
+// for the largest font whose wrapped text fits the box.
+const HTML_GLYPH = 0.54;
+function estimateHtmlFont(box) {
+  const w = Math.max(box.x1 - box.x0, 1);
+  const h = box.y1 - box.y0;
+  const textLines = (box.text || "").split("\n");
+  for (let f = h / 1.05; f > 6; f -= 0.5) {
+    const n = countWrappedLines(textLines, f, w, HTML_GLYPH);
+    if (f * (1.1 + (n - 1) * 1.75) <= h * 1.03) return { size: f, lines: n };
+  }
+  return { size: 6, lines: 1 };
+}
+
+// Body text size for a page: median estimate over its plain text blocks. Used
+// for tables, whose boxes are padded and say nothing about their font.
 function pageBaseFont(boxes) {
   const sizes = boxes
     .filter((b) => b.region_type === "Text" && b.html && !/<(table|ul|ol)\b/i.test(b.html))
-    .map(fitFont)
+    .map((b) => estimateHtmlFont(b).size)
     .sort((a, b) => a - b);
   return sizes.length ? sizes[Math.floor(sizes.length / 2)] : 12;
+}
+
+// Font size and line-height for an html block. Engines that know the real size
+// (pdfplumber tables) say so; otherwise it is estimated from the box.
+function htmlBlockFont(box, baseFont) {
+  if (box.style && box.style.size) return { size: box.style.size, lineHeight: 1.25 };
+  if (/<table\b/i.test(box.html || "")) return { size: baseFont, lineHeight: 1.25 };
+  const { size, lines } = estimateHtmlFont(box);
+  // A stray emoji or icon makes a box taller than its text; don't let it inflate the font.
+  // Body text is one size in practice; estimates within ~30% of the page's
+  // body size are measurement noise (box tightness, emoji), so snap them to it.
+  const isBody = box.region_type === "Text" && size > baseFont * 0.7 && size < baseFont * 1.45;
+  return { size: isBody ? baseFont : size, lineHeight: lines > 1 ? 1.65 : 1.1, nowrap: lines <= 1 };
 }
 
 const HTML_ALLOWED = new Set([
@@ -623,6 +651,8 @@ function sanitizeHtml(raw) {
         if (HTML_ALLOWED.has(tag)) {
           const el = document.createElement(tag);
           ["colspan", "rowspan"].forEach((a) => { if (child.hasAttribute(a)) el.setAttribute(a, child.getAttribute(a)); });
+          const align = child.getAttribute("align");
+          if (align && ["left", "center", "right"].includes(align)) el.setAttribute("align", align);
           // Some engines put the bullet/number in the item text itself; don't draw it twice.
           if (tag === "li" && /^\s*(\d+[.)]|[a-zA-Z][.)]|[\u2022\u25e6\u25aa\u25cf\u25cb\-\u2013*])\s/.test(child.textContent)) {
             el.classList.add("has-marker");
@@ -645,6 +675,10 @@ function sanitizeHtml(raw) {
 function drawBoxes(svg, boxes, color, inPlace = false) {
   if (!state.show.boxes && !state.show.text && !state.show.orderNumbers) return;
   const baseFont = inPlace ? pageBaseFont(boxes) : 0;
+  // Badge size follows the page's coordinate space so it stays legible whether
+  // the engine reports pixels (Datalab, 1600 wide) or points (pdfplumber, 595).
+  const vb = (svg.getAttribute("viewBox") || "").split(" ").map(Number);
+  const badgeSize = Math.max(15, (vb[2] || 500) * 0.03);
   boxes.forEach((box) => {
     const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
 
@@ -665,38 +699,42 @@ function drawBoxes(svg, boxes, color, inPlace = false) {
       // keep their structure, at one page-wide body size rather than a per-box fit.
       const w = Math.max(box.x1 - box.x0, 1);
       const h = box.y1 - box.y0;
-      const lines = Math.max((box.text || "").split("\n").length, 1);
-      const isHeading = box.region_type === "Title" || lines === 1;
-      const f = isHeading ? fitFont(box) : Math.max(Math.min(baseFont, h / (lines * 1.3)), 6);
+      const { size: f, lineHeight, nowrap } = htmlBlockFont(box, baseFont);
       const fo = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
       fo.setAttribute("x", box.x0);
       fo.setAttribute("y", box.y0);
       fo.setAttribute("width", w);
       fo.setAttribute("height", h);
+      fo.setAttribute("overflow", "visible");
       const div = document.createElement("div");
       div.className = "ocr-html";
-      div.style.cssText = `font-size:${f}px;height:${h}px;`;
+      div.style.cssText = `font-size:${f}px;line-height:${lineHeight};height:${h}px;${nowrap ? "white-space:nowrap;" : ""}`;
       div.appendChild(sanitizeHtml(box.html));
       fo.appendChild(div);
       g.appendChild(fo);
     } else if (state.show.text && inPlace && box.style) {
-      // Text-layer engines (pdfplumber): draw with the PDF's real font size and weight.
-      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      t.setAttribute("x", box.x0);
-      t.setAttribute("y", box.y1 - (box.y1 - box.y0) * 0.2);
-      t.setAttribute("font-size", box.style.size);
-      t.setAttribute("font-family", "system-ui, sans-serif");
-      if (box.style.bold) t.setAttribute("font-weight", "700");
-      if (box.style.italic) t.setAttribute("font-style", "italic");
-      t.setAttribute("fill", "#111");
-      // Match the box's real width, since the browser's font isn't the PDF's.
-      t.setAttribute("textLength", Math.max(box.x1 - box.x0, 1));
-      t.setAttribute("lengthAdjust", "spacingAndGlyphs");
-      t.textContent = box.text;
-      const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
-      title.textContent = `${box.style.font} ${box.style.size}pt`;
-      t.appendChild(title);
-      g.appendChild(t);
+      // Text-layer engines (pdfplumber): each run drawn at its own position with
+      // the PDF's real font size, weight and colour, so mixed styling survives.
+      const runs = box.style.runs && box.style.runs.length ? box.style.runs : [{ ...box.style, text: box.text, x0: box.x0, x1: box.x1 }];
+      const baseline = box.y1 - (box.y1 - box.y0) * 0.2;
+      runs.forEach((run) => {
+        const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        t.setAttribute("x", run.x0);
+        t.setAttribute("y", baseline);
+        t.setAttribute("font-size", run.size);
+        t.setAttribute("font-family", "system-ui, sans-serif");
+        if (run.bold) t.setAttribute("font-weight", "700");
+        if (run.italic) t.setAttribute("font-style", "italic");
+        t.setAttribute("fill", run.color || "#111");
+        // Match the run's real width, since the browser's font isn't the PDF's.
+        t.setAttribute("textLength", Math.max(run.x1 - run.x0, 1));
+        t.setAttribute("lengthAdjust", "spacingAndGlyphs");
+        t.textContent = run.text;
+        const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+        title.textContent = `${run.font} ${run.size}pt`;
+        t.appendChild(title);
+        g.appendChild(t);
+      });
     } else if (state.show.text && inPlace) {
       const w = Math.max(box.x1 - box.x0, 1);
       const h = box.y1 - box.y0;
@@ -741,13 +779,15 @@ function drawBoxes(svg, boxes, color, inPlace = false) {
     }
 
     if (state.show.orderNumbers && box.reading_order !== null && box.reading_order !== undefined) {
+      const d = badgeSize;
       const badge = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
-      badge.setAttribute("x", box.x0 - 8);
-      badge.setAttribute("y", box.y0 - 8);
-      badge.setAttribute("width", 15);
-      badge.setAttribute("height", 15);
+      badge.setAttribute("x", box.x0 - d / 2);
+      badge.setAttribute("y", box.y0 - d / 2);
+      badge.setAttribute("width", d);
+      badge.setAttribute("height", d);
       const div = document.createElement("div");
       div.className = "mono box-order-badge";
+      div.style.cssText = `width:${d}px;height:${d}px;font-size:${d * 0.55}px;line-height:${d * 0.8}px;border-width:${Math.max(d * 0.09, 1)}px;`;
       div.style.borderColor = color;
       div.textContent = box.reading_order;
       badge.appendChild(div);
