@@ -1,13 +1,10 @@
-import html as _html
 import itertools
 import os
-import re
 import tempfile
 import time
 
+from ocrhub.adapters._text import strip_html as _strip_html
 from ocrhub.models import BoxResult, OcrResult, PageResult
-
-_HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 # "Page" wraps every top-level block and carries no text of its own; "Picture" has
 # no text either (it's an image region). Both are skipped so we don't emit an empty
@@ -26,10 +23,6 @@ _BLOCK_TYPE_MAP: dict[str, str] = {
     "PageHeader": "Header",
     "PageFooter": "Footer",
 }
-
-
-def _strip_html(raw: str) -> str:
-    return _html.unescape(_HTML_TAG_RE.sub("", raw)).strip()
 
 
 def _map_block_type(block_type: str) -> str:

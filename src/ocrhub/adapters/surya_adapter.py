@@ -4,6 +4,7 @@ import time
 
 from PIL import Image
 
+from ocrhub.adapters._text import strip_html
 from ocrhub.models import BoxResult, OcrResult, PageResult
 from ocrhub.pdf_utils import is_pdf, rasterize_pdf
 
@@ -48,11 +49,12 @@ class SuryaAdapter:
             [prediction] = recognition_predictor([img], det_predictor=detection_predictor)
 
             boxes: list[BoxResult] = []
-            for line in prediction.text_lines:
+            line_texts = [strip_html(line.text) for line in prediction.text_lines]
+            for line, line_text in zip(prediction.text_lines, line_texts):
                 x0, y0, x1, y1 = line.bbox
                 boxes.append(
                     BoxResult(
-                        text=line.text,
+                        text=line_text,
                         x0=float(x0),
                         y0=float(y0),
                         x1=float(x1),
@@ -61,7 +63,7 @@ class SuryaAdapter:
                     )
                 )
 
-            text = "\n".join(line.text for line in prediction.text_lines)
+            text = "\n".join(line_texts)
             confidences = [line.confidence for line in prediction.text_lines if line.confidence is not None]
             page_confidence = sum(confidences) / len(confidences) if confidences else None
 

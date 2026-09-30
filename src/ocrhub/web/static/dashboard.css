@@ -365,7 +365,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 
 .detections-columns {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) 90px 210px;
+  grid-template-columns: 64px minmax(0, 1fr) 90px 140px;
   gap: 12px;
   padding: 8px 14px;
   font-size: 11px;
@@ -383,12 +383,32 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 
 .detections-row {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) 90px 210px;
+  grid-template-columns: 64px minmax(0, 1fr) 90px 140px;
   gap: 12px;
   align-items: center;
   padding: 6px 14px;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 12.5px;
+}
+
+.detections-row > div:nth-child(2) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.run-status {
+  font-size: 12px;
+  color: var(--muted-2);
+}
+
+.run-status.error {
+  color: var(--warn);
+}
+
+.panel-note {
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--muted-2);
 }
 
 .conf-bar {

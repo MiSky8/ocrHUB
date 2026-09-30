@@ -53,3 +53,21 @@ def test_extract_returns_boxes_and_page_image(sample_image_bytes):
     assert (box.x0, box.y0, box.x1, box.y1) == (10.0, 40.0, 180.0, 70.0)
     assert box.confidence == pytest.approx(95.0)
     assert box.reading_order is None
+
+
+def test_extract_strips_markup_from_line_text(sample_image_bytes):
+    adapter = SuryaAdapter()
+
+    fake_line = MagicMock(text="<b>INVOICE</b> A &amp; B", confidence=0.9, bbox=[1.0, 2.0, 30.0, 40.0])
+    fake_prediction = MagicMock(text_lines=[fake_line])
+
+    fake_recognition_cls = MagicMock(return_value=MagicMock(return_value=[fake_prediction]))
+    fake_detection_cls = MagicMock(return_value=MagicMock())
+
+    with patch.object(SuryaAdapter, "_recognition_predictor_cls", fake_recognition_cls), patch.object(
+        SuryaAdapter, "_detection_predictor_cls", fake_detection_cls
+    ):
+        result = adapter.extract(sample_image_bytes, "sample.png")
+
+    assert result.text == "INVOICE A & B"
+    assert result.pages[0].boxes[0].text == "INVOICE A & B"

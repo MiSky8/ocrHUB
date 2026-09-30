@@ -74,17 +74,42 @@ function toggleEngine(name) {
   renderEngineList();
 }
 
-async function runAll() {
-  if (!state.file || state.selected.size === 0) return;
-  const formData = new FormData();
-  formData.append("file", state.file);
-  state.selected.forEach((name) => formData.append("engines", name));
+function setRunStatus(msg, isError) {
+  const el = document.getElementById("run-status");
+  el.textContent = msg;
+  el.classList.toggle("error", !!isError);
+}
 
-  const resp = await fetch("/ocr", { method: "POST", body: formData });
-  const data = await resp.json();
-  data.results.forEach((r) => { state.results[r.engine] = r; });
-  renderEngineList();
-  renderResultsGrid();
+async function runAll() {
+  if (!state.file) { setRunStatus("Choose a file first.", true); return; }
+  if (state.selected.size === 0) { setRunStatus("Select at least one engine.", true); return; }
+  const btn = document.getElementById("run-all-btn");
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Running…";
+  setRunStatus("", false);
+  try {
+    const formData = new FormData();
+    formData.append("file", state.file);
+    state.selected.forEach((name) => formData.append("engines", name));
+
+    const resp = await fetch("/ocr", { method: "POST", body: formData });
+    if (!resp.ok) {
+      let detail = "";
+      try { detail = (await resp.json()).detail || ""; } catch (e) { /* non-JSON body */ }
+      throw new Error(`Request failed (${resp.status})${typeof detail === "string" && detail ? ": " + detail : ""}`);
+    }
+    let data;
+    try { data = await resp.json(); } catch (e) { throw new Error("Server returned a non-JSON response."); }
+    data.results.forEach((r) => { state.results[r.engine] = r; });
+    renderEngineList();
+    renderResultsGrid();
+  } catch (e) {
+    setRunStatus(e && e.message ? e.message : "Request failed.", true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
 }
 
 function toggleCompare(name) {
@@ -157,7 +182,15 @@ function renderDetections() {
     tabsEl.appendChild(tab);
   });
 
-  const page = state.results[state.detectionsTab].pages[0];
+  const pages = state.results[state.detectionsTab].pages;
+  if (!pages.length) {
+    const note = document.createElement("div");
+    note.className = "panel-note";
+    note.textContent = "No pages.";
+    rowsEl.appendChild(note);
+    return;
+  }
+  const page = pages[0];
   const allOrdered = page.boxes.length > 0 && page.boxes.every((b) => b.reading_order !== null && b.reading_order !== undefined);
   const rows = allOrdered
     ? [...page.boxes].sort((a, b) => a.reading_order - b.reading_order)
@@ -173,7 +206,7 @@ function renderDetections() {
     order.textContent = box.reading_order !== null && box.reading_order !== undefined ? box.reading_order : "–";
 
     const text = document.createElement("div");
-    text.style.cssText = "white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+    text.style.cssText = "white-space:normal;overflow-wrap:anywhere;";
     text.textContent = box.text;
     text.title = box.text;
 
@@ -225,7 +258,7 @@ function renderOverlayPanel(names) {
   panel.appendChild(header);
 
   // Canonical image: first engine (in `names` order) whose first page has an image.
-  const canonicalName = names.find((n) => state.results[n].pages[0].image_base64);
+  const canonicalName = names.find((n) => state.results[n].pages.length && state.results[n].pages[0].image_base64);
   if (!canonicalName) return panel;
   const canonicalPage = state.results[canonicalName].pages[0];
 
@@ -241,6 +274,7 @@ function renderOverlayPanel(names) {
     const canonicalW = img.naturalWidth, canonicalH = img.naturalHeight;
 
     names.forEach((name) => {
+      if (!state.results[name].pages.length) return;
       const page = state.results[name].pages[0];
       let scaleX = 1, scaleY = 1;
       if (page.image_base64 && name !== canonicalName) {
@@ -293,6 +327,14 @@ function renderPanel(name, result) {
     return panel;
   }
 
+  if (!result.pages.length) {
+    panel.appendChild(header);
+    const note = document.createElement("div");
+    note.className = "panel-note";
+    note.textContent = "No pages.";
+    panel.appendChild(note);
+    return panel;
+  }
   const page = result.pages[0];
   const stats = document.createElement("div");
   stats.className = "panel-stats mono";
@@ -381,6 +423,12 @@ function handleFileChosen(file) {
   const nameEl = document.getElementById("file-name");
   chip.hidden = false;
   nameEl.textContent = file.name;
+  state.results = {};
+  state.compare.clear();
+  state.detectionsTab = null;
+  setRunStatus("", false);
+  renderEngineList();
+  renderResultsGrid();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
