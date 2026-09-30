@@ -50,3 +50,12 @@ def test_parse_datalab_json_produces_page_text_from_boxes():
 
     assert "Lesson 1: True Authority Effect" in page.text
     assert "People mirror your confidence back." in page.text
+
+
+def test_parse_datalab_json_keeps_original_html_on_boxes():
+    data = json.loads(FIXTURE.read_text())
+    page = parse_datalab_json(data)[0]
+
+    list_box = next(b for b in page.boxes if "Master stillness" in b.text)
+    assert list_box.html.startswith("<ol")
+    assert "<li>" in list_box.html

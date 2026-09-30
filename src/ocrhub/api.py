@@ -72,7 +72,7 @@ def create_app(registry: EngineRegistry | None = None, store: ResultStore | None
         )
         return {
             "results": [
-                vars(r)
+                {k: v for k, v in vars(r).items() if k != "raw"}
                 | {
                     "ok": r.ok,
                     "pages": [

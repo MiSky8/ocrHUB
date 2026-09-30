@@ -69,3 +69,13 @@ def test_save_input_is_idempotent(tmp_path):
 
     saved = list((tmp_path / "input").glob("deadbeef0000-*"))
     assert len(saved) == 1
+
+
+def test_raw_engine_response_survives_save_and_load(tmp_path):
+    from ocrhub.models import OcrResult
+    from ocrhub.storage import ResultStore
+
+    store = ResultStore(tmp_path)
+    store.save("abc", "datalab", OcrResult(engine="datalab", text="x", raw={"children": []}))
+
+    assert store.get("abc", "datalab").raw == {"children": []}

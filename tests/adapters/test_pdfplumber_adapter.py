@@ -20,3 +20,14 @@ def test_extract_rejects_non_pdf():
     adapter = PdfplumberAdapter()
     with pytest.raises(ValueError):
         adapter.extract(b"not a pdf", "photo.png")
+
+
+def test_extract_returns_line_boxes_with_font_style(sample_born_digital_pdf_bytes):
+    result = PdfplumberAdapter().extract(sample_born_digital_pdf_bytes, "sample.pdf")
+
+    page = result.pages[0]
+    assert page.width and page.height
+    box = next(b for b in page.boxes if "OCRHUB" in b.text)
+    assert box.style["size"] > 0
+    assert box.style["font"]
+    assert box.x1 > box.x0 and box.y1 > box.y0

@@ -3,6 +3,7 @@ const ENGINE_COLORS = {
   surya: "#b04a06",
   paddleocr: "#6b3fa0",
   datalab: "#2f7d4f",
+  pdfplumber: "#8a8a8a",
   "ollama-deepseek": "#a7a195",
 };
 
@@ -547,8 +548,8 @@ function renderPageWithBoxes(page, engineName) {
   if (!page.image_base64) {
     // No page image (e.g. datalab): draw on a blank page sized to the boxes.
     if (!page.boxes.length) return wrap;
-    const w = Math.max(...page.boxes.map((b) => b.x1)) + Math.min(...page.boxes.map((b) => b.x0));
-    const h = Math.max(...page.boxes.map((b) => b.y1)) + Math.min(...page.boxes.map((b) => b.y0));
+    const w = page.width || Math.max(...page.boxes.map((b) => b.x1)) + Math.min(...page.boxes.map((b) => b.x0));
+    const h = page.height || Math.max(...page.boxes.map((b) => b.y1)) + Math.min(...page.boxes.map((b) => b.y0));
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.classList.add("blank-page");
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
@@ -573,10 +574,77 @@ function renderPageWithBoxes(page, engineName) {
   return wrap;
 }
 
+
+// Average glyph is ~0.6em wide; lines are 1.25em tall.
+function countWrappedLines(textLines, size, width) {
+  return textLines.reduce((sum, t) => sum + Math.max(1, Math.ceil((t.length * 0.6 * size) / width)), 0);
+}
+
+// Largest font where the box's text, wrapped to the box width, fits its height.
+function fitFont(box) {
+  const w = Math.max(box.x1 - box.x0, 1);
+  const h = box.y1 - box.y0;
+  const textLines = (box.text || "").split("\n");
+  let f = Math.max(h * 0.85, 6);
+  let lines = countWrappedLines(textLines, f, w);
+  while (lines > 1 && f > 6 && lines * f * 1.25 > h) {
+    f -= 1;
+    lines = countWrappedLines(textLines, f, w);
+  }
+  return f;
+}
+
+// Body text size for a page: the median fitted size of its plain text blocks,
+// so tables and lists (which have no size of their own) match the paragraphs.
+function pageBaseFont(boxes) {
+  const sizes = boxes
+    .filter((b) => b.region_type === "Text" && b.html && !/<(table|ul|ol)\b/i.test(b.html))
+    .map(fitFont)
+    .sort((a, b) => a - b);
+  return sizes.length ? sizes[Math.floor(sizes.length / 2)] : 12;
+}
+
+const HTML_ALLOWED = new Set([
+  "p", "div", "span", "br", "b", "strong", "i", "em", "u", "sub", "sup", "ul", "ol", "li",
+  "table", "thead", "tbody", "tr", "td", "th", "h1", "h2", "h3", "h4", "h5", "h6",
+]);
+
+// Rebuild engine-supplied markup from an allowlist of tags; drops every
+// attribute except table spans, so nothing executable can come through.
+function sanitizeHtml(raw) {
+  const doc = new DOMParser().parseFromString(raw, "text/html");
+  const clean = (node, into) => {
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        into.appendChild(document.createTextNode(child.textContent));
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const tag = child.tagName.toLowerCase();
+        if (tag === "script" || tag === "style") return;
+        if (HTML_ALLOWED.has(tag)) {
+          const el = document.createElement(tag);
+          ["colspan", "rowspan"].forEach((a) => { if (child.hasAttribute(a)) el.setAttribute(a, child.getAttribute(a)); });
+          // Some engines put the bullet/number in the item text itself; don't draw it twice.
+          if (tag === "li" && /^\s*(\d+[.)]|[a-zA-Z][.)]|[\u2022\u25e6\u25aa\u25cf\u25cb\-\u2013*])\s/.test(child.textContent)) {
+            el.classList.add("has-marker");
+          }
+          clean(child, el);
+          into.appendChild(el);
+        } else {
+          clean(child, into);
+        }
+      }
+    });
+  };
+  const frag = document.createDocumentFragment();
+  clean(doc.body, frag);
+  return frag;
+}
+
 // inPlace: draw the OCR text at each box's position on a blank page (the
 // page image is hidden), instead of a small label under the box.
 function drawBoxes(svg, boxes, color, inPlace = false) {
   if (!state.show.boxes && !state.show.text && !state.show.orderNumbers) return;
+  const baseFont = inPlace ? pageBaseFont(boxes) : 0;
   boxes.forEach((box) => {
     const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
 
@@ -592,19 +660,49 @@ function drawBoxes(svg, boxes, color, inPlace = false) {
       g.appendChild(rect);
     }
 
-    if (state.show.text && inPlace) {
+    if (state.show.text && inPlace && box.html) {
+      // Engines that return markup (Datalab): render it, so lists and tables
+      // keep their structure, at one page-wide body size rather than a per-box fit.
+      const w = Math.max(box.x1 - box.x0, 1);
+      const h = box.y1 - box.y0;
+      const lines = Math.max((box.text || "").split("\n").length, 1);
+      const isHeading = box.region_type === "Title" || lines === 1;
+      const f = isHeading ? fitFont(box) : Math.max(Math.min(baseFont, h / (lines * 1.3)), 6);
+      const fo = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
+      fo.setAttribute("x", box.x0);
+      fo.setAttribute("y", box.y0);
+      fo.setAttribute("width", w);
+      fo.setAttribute("height", h);
+      const div = document.createElement("div");
+      div.className = "ocr-html";
+      div.style.cssText = `font-size:${f}px;height:${h}px;`;
+      div.appendChild(sanitizeHtml(box.html));
+      fo.appendChild(div);
+      g.appendChild(fo);
+    } else if (state.show.text && inPlace && box.style) {
+      // Text-layer engines (pdfplumber): draw with the PDF's real font size and weight.
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      t.setAttribute("x", box.x0);
+      t.setAttribute("y", box.y1 - (box.y1 - box.y0) * 0.2);
+      t.setAttribute("font-size", box.style.size);
+      t.setAttribute("font-family", "system-ui, sans-serif");
+      if (box.style.bold) t.setAttribute("font-weight", "700");
+      if (box.style.italic) t.setAttribute("font-style", "italic");
+      t.setAttribute("fill", "#111");
+      // Match the box's real width, since the browser's font isn't the PDF's.
+      t.setAttribute("textLength", Math.max(box.x1 - box.x0, 1));
+      t.setAttribute("lengthAdjust", "spacingAndGlyphs");
+      t.textContent = box.text;
+      const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+      title.textContent = `${box.style.font} ${box.style.size}pt`;
+      t.appendChild(title);
+      g.appendChild(t);
+    } else if (state.show.text && inPlace) {
       const w = Math.max(box.x1 - box.x0, 1);
       const h = box.y1 - box.y0;
       const textLines = (box.text || "").split("\n");
-      // Largest font where the text, wrapped to the box width, fits its height
-      // (average glyph is ~0.6em wide, lines are 1.25em tall).
-      let f = Math.max(h * 0.85, 6);
-      const countLines = (size) => textLines.reduce((sum, t) => sum + Math.max(1, Math.ceil((t.length * 0.6 * size) / w)), 0);
-      let lines = countLines(f);
-      while (lines > 1 && f > 6 && lines * f * 1.25 > h) {
-        f -= 1;
-        lines = countLines(f);
-      }
+      const f = fitFont(box);
+      const lines = countWrappedLines(textLines, f, w);
       if (lines <= 1) {
         const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
         t.setAttribute("x", box.x0);

@@ -20,6 +20,8 @@ def _result_from_dict(data: dict) -> OcrResult:
             confidence=p.get("confidence"),
             boxes=[BoxResult(**b) for b in p.get("boxes", [])],
             image_base64=p.get("image_base64"),
+            width=p.get("width"),
+            height=p.get("height"),
         )
         for p in data.get("pages", [])
     ]
@@ -30,6 +32,7 @@ def _result_from_dict(data: dict) -> OcrResult:
         confidence=data.get("confidence"),
         elapsed_ms=data.get("elapsed_ms", 0),
         error=data.get("error"),
+        raw=data.get("raw"),
     )
 
 

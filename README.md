@@ -120,9 +120,11 @@ re-downloading their weights.
 
 ## Persistent input/output storage
 
-Every `/ocr` request saves the uploaded file and each engine's result to
-`/home/ocrhub/data` inside the container, under a directory named after
-the SHA-256 hash of the file's contents:
+Every `/ocr` request saves the uploaded file and each engine's result
+under a directory named after the SHA-256 hash of the file's contents.
+With `docker compose` this is the plain folder **`./data`** next to
+`docker-compose.yml` (set `OCRHUB_DATA_DIR` to put it elsewhere), so you can
+open the results straight from Finder or use them from your own scripts:
 
 ```
 data/input/<hash>-<original-filename>
@@ -130,9 +132,15 @@ data/output/<hash>/_meta.json          # original filename, timestamp
 data/output/<hash>/<engine>.json       # that engine's OcrResult
 ```
 
-If you use `docker compose` (recommended, see Quickstart), this is
-already mounted as the `ocrhub-data` volume - no extra setup needed. With
-plain `docker run`, add `-v ocrhub-data:/home/ocrhub/data`.
+Each `<engine>.json` holds the extracted text, and per page the boxes
+(coordinates, reading order, region type). Extras by engine: Datalab boxes
+keep the original `html` (lists, tables), and the file has a `raw` field with
+Datalab's untouched response; pdfplumber boxes carry the PDF's real font
+name, size, bold and italic in `style`.
+
+With plain `docker run`, add `-v "$PWD/data:/home/ocrhub/data"`. On a Linux
+host the folder must be writable by uid 1000 (the container's `ocrhub` user);
+on Docker Desktop for Mac this just works.
 
 This is also the result cache: if the same file's hash already has a
 saved result for a given engine, `/ocr` returns it instead of re-running

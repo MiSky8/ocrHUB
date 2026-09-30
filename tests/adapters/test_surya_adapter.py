@@ -103,3 +103,21 @@ def test_strip_html_keeps_table_cells_and_list_items_apart():
     assert strip_html(table) == "Region | Q1\nNorth | $12,450"
     assert strip_html("<ul><li>One</li><li>Two</li></ul>") == "One\nTwo"
     assert strip_html("<b>bold</b> &amp; plain") == "bold & plain"
+
+
+def test_html_to_text_adds_list_markers_unless_already_in_text():
+    from ocrhub.adapters._text import html_to_text
+
+    assert html_to_text("<ul><li>One</li><li>Two</li></ul>") == "• One\n• Two"
+    assert html_to_text("<ol><li>One</li><li>Two</li></ol>") == "1. One\n2. Two"
+    marked = '<ol style="list-style-type: none"><li>1. One</li></ol>'
+    assert html_to_text(marked) == "1. One"
+    table = "<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>"
+    assert html_to_text(table) == "A | B\n1 | 2"
+
+
+def test_html_to_text_adds_markers_when_list_marks_none_but_text_has_no_marker():
+    from ocrhub.adapters._text import html_to_text
+
+    raw = '<ol style="list-style-type: none"><li>Review</li><li>Plan</li></ol>'
+    assert html_to_text(raw) == "1. Review\n2. Plan"

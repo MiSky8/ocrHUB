@@ -3,7 +3,7 @@ import os
 import tempfile
 import time
 
-from ocrhub.adapters._text import strip_html as _strip_html
+from ocrhub.adapters._text import html_to_text
 from ocrhub.models import BoxResult, OcrResult, PageResult
 
 # "Page" wraps every top-level block and carries no text of its own; "Picture" has
@@ -38,7 +38,8 @@ def _walk(block: dict, counter: "itertools.count[int]") -> list[BoxResult]:
             boxes.extend(_walk(child, counter))
         return boxes
 
-    text = _strip_html(block.get("html", ""))
+    html = block.get("html") or ""
+    text = html_to_text(html)
     bbox = block.get("bbox")
     if text and bbox and len(bbox) == 4:
         try:
@@ -55,6 +56,7 @@ def _walk(block: dict, counter: "itertools.count[int]") -> list[BoxResult]:
                     y1=y1,
                     reading_order=next(counter),
                     region_type=_map_block_type(block_type),
+                    html=html,
                 )
             )
 
@@ -90,22 +92,24 @@ class DatalabAdapter:
     def extract(self, file_bytes: bytes, filename: str) -> OcrResult:
         start = time.monotonic()
         try:
-            pages = self._convert(file_bytes, filename)
+            pages, raw = self._convert(file_bytes, filename)
         except Exception as e:  # noqa: BLE001 - per-engine failure isolation
             return OcrResult(engine=self.name, text="", error=str(e))
 
         elapsed_ms = int((time.monotonic() - start) * 1000)
         full_text = "\n\n".join(p.text for p in pages)
-        return OcrResult(engine=self.name, text=full_text, pages=pages, elapsed_ms=elapsed_ms)
+        return OcrResult(
+            engine=self.name, text=full_text, pages=pages, elapsed_ms=elapsed_ms, raw=raw
+        )
 
-    def _convert(self, file_bytes: bytes, filename: str) -> list[PageResult]:
+    def _convert(self, file_bytes: bytes, filename: str) -> tuple[list[PageResult], dict]:
         import asyncio
 
         from datalab_sdk import AsyncDatalabClient, ConvertOptions
 
         suffix = "_" + (filename or "upload")
 
-        async def run() -> list[PageResult]:
+        async def run() -> tuple[list[PageResult], dict]:
             with tempfile.NamedTemporaryFile(suffix=suffix) as tmp:
                 tmp.write(file_bytes)
                 tmp.flush()
@@ -117,6 +121,6 @@ class DatalabAdapter:
 
             if not result.success or not isinstance(result.json, dict):
                 raise RuntimeError(getattr(result, "error", None) or "Datalab conversion failed")
-            return parse_datalab_json(result.json)
+            return parse_datalab_json(result.json), result.json
 
         return asyncio.run(run())
