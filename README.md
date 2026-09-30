@@ -26,6 +26,16 @@ docker compose logs -f
 If the page looks wrong after an update, rebuild with
 `docker compose up --build` and hard-refresh the browser (Cmd+Shift+R).
 
+If a build fails with `No space left on device`, Docker's disk is full
+(each build with Surya leaves several GB of cache). Free it with:
+
+```bash
+docker builder prune -f && docker image prune -f
+```
+
+This doesn't touch your saved results or downloaded models. To stop it
+recurring, raise Docker Desktop -> Settings -> Resources -> Disk image size.
+
 **One config file, one command:** copy `.env.example` to
 `.env`, edit it to pick which engines to build (`ENGINES=`) and set any
 runtime config (`OLLAMA_HOST`, `DATALAB_API_KEY`, ...), then:
