@@ -16,6 +16,11 @@ services:
       - DATALAB_BASE_URL=${DATALAB_BASE_URL:-}
       - DATALAB_MODE=${DATALAB_MODE:-}
       - DATALAB_TIMEOUT=${DATALAB_TIMEOUT:-}
+      # Surya on CPU holds a whole batch of line crops in memory; its default
+      # batch got the container OOM-killed on a phone photo. Smaller = slower
+      # but safe on Docker Desktop's default ~8 GB. Raise both if you have RAM.
+      - RECOGNITION_BATCH_SIZE=${SURYA_RECOGNITION_BATCH_SIZE:-8}
+      - DETECTOR_BATCH_SIZE=${SURYA_DETECTOR_BATCH_SIZE:-1}
     volumes:
       # Persists downloaded Surya/PaddleOCR model weights across restarts.
       - ocrhub-models:/home/ocrhub/.cache

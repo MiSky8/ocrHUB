@@ -1,4 +1,5 @@
 from ocrhub.models import OcrResult
+from ocrhub.pdf_utils import normalize_image
 from ocrhub.registry import EngineRegistry
 from ocrhub.storage import ResultStore, content_hash
 
@@ -19,6 +20,9 @@ def process_document(
         hash_id = content_hash(file_bytes)
         store.save_input(hash_id, filename, file_bytes)
 
+    # The original is stored as uploaded; engines get the normalised copy.
+    engine_bytes, engine_filename = normalize_image(file_bytes, filename)
+
     for name in engine_names:
         if name not in available:
             results.append(OcrResult(engine=name, text="", error="engine not available"))
@@ -32,7 +36,7 @@ def process_document(
 
         adapter = registry.get(name)
         try:
-            result = adapter.extract(file_bytes, filename)
+            result = adapter.extract(engine_bytes, engine_filename)
         except Exception as exc:  # noqa: BLE001 - per-engine isolation is the point
             result = OcrResult(engine=name, text="", error=str(exc))
 

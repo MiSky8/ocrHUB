@@ -177,6 +177,52 @@ Or, since `ocr_document` is exposed over MCP, an MCP-capable agent (e.g.
 Claude) can drive it directly - point it at a local folder and ask it to
 OCR every file with the engines you want, no script required.
 
+## Memory, speed and input limits
+
+The engines run on CPU inside the container. Timings below are from our own
+tests on a Docker Desktop Mac (8 GB limit), so treat them as rough:
+
+| Engine | Typical time | Memory |
+| --- | --- | --- |
+| pdfplumber | under a second (born-digital PDFs only) | tiny |
+| Tesseract | 2-20 s per page (longer for dense pages) | small |
+| Datalab | 10 s - 2.5 min in our tests (hosted, so it depends on their queue) | none locally |
+| Surya | ~1.5 min for a simple page or a receipt photo, **12 min for a dense newspaper page** | **5+ GB** |
+| PaddleOCR | not measured here | not measured here |
+
+**If Surya (or the whole container) just disappears with no error**, it was
+almost certainly killed for running out of memory: Docker Desktop's default
+limit is about 8 GB and Surya alone can use 5-6 GB. Confirm with:
+
+```bash
+docker inspect ocrhub-ocrhub-1 --format 'OOMKilled={{.State.OOMKilled}} exit={{.State.ExitCode}}'
+```
+
+`OOMKilled=true` / exit code 137 means yes. Restart with `docker compose up -d`
+and either give Docker more memory (Docker Desktop > Settings > Resources) or
+lower Surya's batch sizes in `.env` (smaller is slower but uses less memory;
+the defaults are already conservative):
+
+```
+SURYA_RECOGNITION_BATCH_SIZE=8
+SURYA_DETECTOR_BATCH_SIZE=1
+```
+
+Watch what the container is doing with `docker compose logs -f ocrhub`.
+
+Every engine you tick is sent as its own request, so fast engines show their
+results while slow ones are still running, and results are cached on disk
+either way: if you close the tab during a long Surya run, re-uploading the
+same file later returns whatever finished.
+
+**Images.** Uploads are normalised before any engine sees them: the EXIF
+rotation is applied (phone photos are stored sideways), the image is
+flattened to RGB, its longest side is capped at 3000 px and it is re-encoded
+as PNG. The original is kept untouched in `data/input`. HEIC files (iPhone
+photos exported directly, e.g. via AirDrop) are not supported yet - export
+them as JPEG first. Dense pages such as newspapers are best uploaded as
+born-digital PDFs; photographed pages will be slower and less accurate.
+
 ## GPU acceleration
 
 Everything running **inside** this container — Tesseract, pdfplumber,
