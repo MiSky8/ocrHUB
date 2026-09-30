@@ -94,3 +94,12 @@ def test_remove_incomplete_models_ignores_missing_cache_dir(tmp_path):
     from ocrhub.adapters.surya_adapter import remove_incomplete_models
 
     assert remove_incomplete_models(tmp_path / "nope", lambda d: False) == []
+
+
+def test_strip_html_keeps_table_cells_and_list_items_apart():
+    from ocrhub.adapters._text import strip_html
+
+    table = "<table><tr><th>Region</th><th>Q1</th></tr><tr><td>North</td><td>$12,450</td></tr></table>"
+    assert strip_html(table) == "Region | Q1\nNorth | $12,450"
+    assert strip_html("<ul><li>One</li><li>Two</li></ul>") == "One\nTwo"
+    assert strip_html("<b>bold</b> &amp; plain") == "bold & plain"

@@ -595,14 +595,15 @@ function drawBoxes(svg, boxes, color, inPlace = false) {
     if (state.show.text && inPlace) {
       const w = Math.max(box.x1 - box.x0, 1);
       const h = box.y1 - box.y0;
-      const n = (box.text || "").length;
+      const textLines = (box.text || "").split("\n");
       // Largest font where the text, wrapped to the box width, fits its height
       // (average glyph is ~0.6em wide, lines are 1.25em tall).
       let f = Math.max(h * 0.85, 6);
-      let lines = Math.ceil((n * 0.6 * f) / w);
+      const countLines = (size) => textLines.reduce((sum, t) => sum + Math.max(1, Math.ceil((t.length * 0.6 * size) / w)), 0);
+      let lines = countLines(f);
       while (lines > 1 && f > 6 && lines * f * 1.25 > h) {
         f -= 1;
-        lines = Math.ceil((n * 0.6 * f) / w);
+        lines = countLines(f);
       }
       if (lines <= 1) {
         const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -622,7 +623,7 @@ function drawBoxes(svg, boxes, color, inPlace = false) {
         fo.setAttribute("width", w);
         fo.setAttribute("height", h);
         const div = document.createElement("div");
-        div.style.cssText = `font:${f}px/1.25 system-ui,sans-serif;color:#111;overflow:hidden;height:${h}px;overflow-wrap:anywhere;`;
+        div.style.cssText = `font:${f}px/1.25 system-ui,sans-serif;color:#111;overflow:hidden;height:${h}px;overflow-wrap:anywhere;white-space:pre-wrap;`;
         div.textContent = box.text;
         fo.appendChild(div);
         g.appendChild(fo);
