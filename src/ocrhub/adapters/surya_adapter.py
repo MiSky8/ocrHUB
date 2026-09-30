@@ -1,12 +1,48 @@
 import base64
 import io
+import logging
+import shutil
 import time
+from pathlib import Path
 
 from PIL import Image
 
 from ocrhub.adapters._text import strip_html
 from ocrhub.models import BoxResult, OcrResult, PageResult
 from ocrhub.pdf_utils import is_pdf, rasterize_pdf
+
+
+logger = logging.getLogger(__name__)
+
+
+def remove_incomplete_models(cache_dir, is_complete) -> list[Path]:
+    """Delete model dirs (<cache>/<name>/<version>) that failed to finish downloading.
+
+    Surya downloads into a temp dir and then moves the files into place. If that
+    is interrupted (e.g. the disk fills up), a half-populated dir is left behind
+    and every later download fails with "Destination path ... already exists".
+    Removing such dirs lets Surya download them again.
+    """
+    removed: list[Path] = []
+    root = Path(cache_dir)
+    if not root.is_dir():
+        return removed
+    for model_dir in sorted(root.glob("*/*")):
+        if model_dir.is_dir() and not is_complete(model_dir):
+            logger.warning("Removing incomplete Surya model download: %s", model_dir)
+            shutil.rmtree(model_dir, ignore_errors=True)
+            removed.append(model_dir)
+    return removed
+
+
+def _heal_model_cache() -> None:
+    try:
+        from surya.common.s3 import check_manifest
+        from surya.settings import settings
+    except ImportError:
+        return
+
+    remove_incomplete_models(settings.MODEL_CACHE_DIR, check_manifest)
 
 
 class SuryaAdapter:
@@ -40,6 +76,7 @@ class SuryaAdapter:
         else:
             page_images = [file_bytes]
 
+        _heal_model_cache()
         recognition_predictor = self._recognition_predictor_cls()
         detection_predictor = self._detection_predictor_cls()
 

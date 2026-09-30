@@ -71,3 +71,26 @@ def test_extract_strips_markup_from_line_text(sample_image_bytes):
 
     assert result.text == "INVOICE A & B"
     assert result.pages[0].boxes[0].text == "INVOICE A & B"
+
+
+def test_remove_incomplete_models_deletes_only_unfinished_dirs(tmp_path):
+    from ocrhub.adapters.surya_adapter import remove_incomplete_models
+
+    good = tmp_path / "text_detection" / "2025_05_07"
+    bad = tmp_path / "text_recognition" / "2025_05_16"
+    for d in (good, bad):
+        d.mkdir(parents=True)
+        (d / "README.md").write_text("x")
+    (good / "manifest.json").write_text("{}")
+
+    removed = remove_incomplete_models(tmp_path, lambda d: (d / "manifest.json").exists())
+
+    assert removed == [bad]
+    assert good.exists()
+    assert not bad.exists()
+
+
+def test_remove_incomplete_models_ignores_missing_cache_dir(tmp_path):
+    from ocrhub.adapters.surya_adapter import remove_incomplete_models
+
+    assert remove_incomplete_models(tmp_path / "nope", lambda d: False) == []
