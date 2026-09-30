@@ -458,17 +458,21 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 :root { --page-max-h: calc(100vh - 250px); }
 
 .results-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
-  align-items: flex-start;
-  overflow-x: auto;
-  padding-bottom: 4px;
+  align-items: start;
 }
 
-.results-row > .engine-panel {
-  flex: 1 1 300px;
-  min-width: 280px;
-  max-width: 560px;
+.results-row > .engine-panel { min-width: 0; }
+
+.main > * { flex-shrink: 0; }
+
+.blank-page {
+  display: block;
+  width: 100%;
+  max-height: var(--page-max-h, 60vh);
+  background: #fff;
 }
 
 .results-block { display: block; }

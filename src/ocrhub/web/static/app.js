@@ -544,7 +544,18 @@ function renderPanel(name, result) {
 function renderPageWithBoxes(page, engineName) {
   const wrap = document.createElement("div");
   wrap.className = "page-image-wrap ocr-only";
-  if (!page.image_base64) return wrap;
+  if (!page.image_base64) {
+    // No page image (e.g. datalab): draw on a blank page sized to the boxes.
+    if (!page.boxes.length) return wrap;
+    const w = Math.max(...page.boxes.map((b) => b.x1)) + Math.min(...page.boxes.map((b) => b.x0));
+    const h = Math.max(...page.boxes.map((b) => b.y1)) + Math.min(...page.boxes.map((b) => b.y0));
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.classList.add("blank-page");
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    drawBoxes(svg, page.boxes, ENGINE_COLORS[engineName] || "#999", true);
+    wrap.appendChild(svg);
+    return wrap;
+  }
 
   const img = document.createElement("img");
   img.src = `data:image/png;base64,${page.image_base64}`;
