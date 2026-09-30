@@ -16,6 +16,11 @@ docker compose up --build
 Then open <http://localhost:8000>. Stop it with `Ctrl+C`. (This builds the
 smallest image: tesseract + pdfplumber only. To add more engines, see below.)
 
+The first build is slow: with Surya it downloads several GB of packages and
+can take 15-60 minutes. After that, rebuilds that only change the code take
+seconds. Only changing `ENGINES` or `pyproject.toml` reinstalls the packages.
+Surya also downloads its model on first use, so its first run is slow too.
+
 To see what the app is doing (engine progress, errors, model downloads),
 open a second terminal in this folder and run:
 
