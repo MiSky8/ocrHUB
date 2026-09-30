@@ -101,7 +101,10 @@ async function runAll() {
     }
     let data;
     try { data = await resp.json(); } catch (e) { throw new Error("Server returned a non-JSON response."); }
-    data.results.forEach((r) => { state.results[r.engine] = r; });
+    data.results.forEach((r) => {
+      state.results[r.engine] = r;
+      if (r.ok && state.compare.size < 3) state.compare.add(r.engine);
+    });
     renderEngineList();
     renderResultsGrid();
   } catch (e) {
@@ -160,6 +163,12 @@ function renderResultsGrid() {
   renderDetections();
 }
 
+function colorDot(name, size) {
+  const dot = document.createElement("span");
+  dot.style.cssText = `display:inline-block;width:${size}px;height:${size}px;border-radius:3px;background:${ENGINE_COLORS[name] || "#999"}`;
+  return dot;
+}
+
 function renderDetections() {
   const tabsEl = document.getElementById("detections-tabs");
   const rowsEl = document.getElementById("detections-rows");
@@ -176,8 +185,8 @@ function renderDetections() {
     const tab = document.createElement("button");
     tab.type = "button";
     tab.className = "detections-tab" + (name === state.detectionsTab ? " active" : "");
-    const dot = `<span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${ENGINE_COLORS[name] || "#999"}"></span>`;
-    tab.innerHTML = `${dot} ${name}`;
+    tab.appendChild(colorDot(name, 9));
+    tab.appendChild(document.createTextNode(` ${name}`));
     tab.addEventListener("click", () => { state.detectionsTab = name; renderDetections(); });
     tabsEl.appendChild(tab);
   });
@@ -252,7 +261,8 @@ function renderOverlayPanel(names) {
   names.forEach((name) => {
     const chip = document.createElement("span");
     chip.style.cssText = `display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;margin-right:12px;`;
-    chip.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${ENGINE_COLORS[name] || "#999"}"></span>${name}`;
+    chip.appendChild(colorDot(name, 10));
+    chip.appendChild(document.createTextNode(name));
     header.appendChild(chip);
   });
   panel.appendChild(header);
