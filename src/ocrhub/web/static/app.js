@@ -123,7 +123,8 @@ function renderResultsList() {
       return;
     }
     const boxes = r.pages.length ? r.pages[0].boxes.length : 0;
-    addRow(name, true, `${boxes} boxes · ${r.elapsed_ms} ms`, state.visible.has(name), () => toggleVisible(name), false);
+    const meta = isTextOnly(r) ? `text only · ${r.elapsed_ms} ms` : `${boxes} boxes · ${r.elapsed_ms} ms`;
+    addRow(name, true, meta, state.visible.has(name), () => toggleVisible(name), false);
   });
 }
 
@@ -339,10 +340,21 @@ function renderDetections() {
     return;
   }
   const page = pages[0];
-  const allOrdered = page.boxes.length > 0 && page.boxes.every((b) => b.reading_order !== null && b.reading_order !== undefined);
-  const rows = allOrdered
-    ? [...page.boxes].sort((a, b) => a.reading_order - b.reading_order)
-    : page.boxes;
+  let rows;
+  if (isTextOnly(state.results[state.detectionsTab])) {
+    // No boxes: list the scraped text lines in the order they were read.
+    rows = [];
+    pages.forEach((p) => {
+      p.text.split("\n").filter((t) => t.trim()).forEach((t) => {
+        rows.push({ text: t, reading_order: rows.length + 1, confidence: null });
+      });
+    });
+  } else {
+    const allOrdered = page.boxes.length > 0 && page.boxes.every((b) => b.reading_order !== null && b.reading_order !== undefined);
+    rows = allOrdered
+      ? [...page.boxes].sort((a, b) => a.reading_order - b.reading_order)
+      : page.boxes;
+  }
 
   rows.forEach((box, i) => {
     const row = document.createElement("div");
@@ -381,7 +393,9 @@ function renderDetections() {
 
     const bbox = document.createElement("div");
     bbox.style.color = "var(--muted-2)";
-    bbox.textContent = `${Math.round(box.x0)}, ${Math.round(box.y0)}, ${Math.round(box.x1 - box.x0)}, ${Math.round(box.y1 - box.y0)}`;
+    bbox.textContent = Number.isFinite(box.x0)
+      ? `${Math.round(box.x0)}, ${Math.round(box.y0)}, ${Math.round(box.x1 - box.x0)}, ${Math.round(box.y1 - box.y0)}`
+      : "–";
 
     row.appendChild(order);
     row.appendChild(text);
@@ -454,6 +468,28 @@ function scaleBoxes(boxes, scaleX, scaleY) {
   }));
 }
 
+// Engines such as pdfplumber read a PDF's text layer: text, but no boxes or page image.
+function isTextOnly(result) {
+  return result.pages.length > 0 && result.pages.every((p) => !p.image_base64 && p.boxes.length === 0);
+}
+
+function renderTextBody(result) {
+  const body = document.createElement("div");
+  body.className = "text-body";
+  result.pages.forEach((p) => {
+    if (result.pages.length > 1) {
+      const h = document.createElement("div");
+      h.className = "text-page-label mono";
+      h.textContent = `Page ${p.page_number}`;
+      body.appendChild(h);
+    }
+    const pre = document.createElement("pre");
+    pre.textContent = p.text || "(no text found)";
+    body.appendChild(pre);
+  });
+  return body;
+}
+
 function renderPanel(name, result) {
   const panel = document.createElement("section");
   panel.className = "engine-panel";
@@ -485,6 +521,15 @@ function renderPanel(name, result) {
     return panel;
   }
   const page = result.pages[0];
+  if (isTextOnly(result)) {
+    const stats = document.createElement("div");
+    stats.className = "panel-stats mono";
+    stats.textContent = `${result.pages.length} page${result.pages.length === 1 ? "" : "s"} · text only · ${result.elapsed_ms} ms`;
+    header.appendChild(stats);
+    panel.appendChild(header);
+    panel.appendChild(renderTextBody(result));
+    return panel;
+  }
   const stats = document.createElement("div");
   stats.className = "panel-stats mono";
   const conf = page.confidence != null ? Math.round(page.confidence <= 1 ? page.confidence * 100 : page.confidence) + "%" : "–";
