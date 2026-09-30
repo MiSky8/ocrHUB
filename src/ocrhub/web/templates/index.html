@@ -31,8 +31,13 @@
       </div>
 
       <div class="sidebar-section">
-        <div class="sidebar-label">Engines</div>
+        <div class="sidebar-label">Engines to run</div>
         <div id="engine-list"></div>
+      </div>
+
+      <div class="sidebar-section" id="results-section" hidden>
+        <div class="sidebar-label">Results shown</div>
+        <div id="results-list"></div>
       </div>
     </aside>
 
@@ -41,7 +46,7 @@
         <h1>Compare engines</h1>
         <div style="flex-grow:1"></div>
         <span id="run-status" class="run-status" role="status"></span>
-        <button type="button" id="run-all-btn" class="run-all-btn">Run all engines</button>
+        <button type="button" id="run-all-btn" class="run-all-btn">Run selected</button>
       </div>
 
       <div class="toolbar">

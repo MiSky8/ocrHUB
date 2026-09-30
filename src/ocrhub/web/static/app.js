@@ -6,17 +6,29 @@ const ENGINE_COLORS = {
   "ollama-deepseek": "#a7a195",
 };
 
+const PDF_ONLY = new Set(["pdfplumber"]);
+
 const state = {
   engines: [],
-  selected: new Set(),
+  selected: new Set(),   // engines to RUN
   file: null,
   results: {},
-  compare: new Set(),
+  visible: new Set(),    // engines whose results are SHOWN
+  showOriginal: true,
+  originalUrl: null,
 };
 state.layoutMode = "side-by-side";
 state.detectionsTab = null;
 state.running = new Set();
 let runTimer = null;
+
+function isPdfFile() {
+  return !!state.file && (state.file.type === "application/pdf" || /\.pdf$/i.test(state.file.name));
+}
+
+function engineDisabledReason(name) {
+  return PDF_ONLY.has(name) && state.file && !isPdfFile() ? "PDF only" : "";
+}
 
 async function loadEngines() {
   const resp = await fetch("/engines");
@@ -26,19 +38,17 @@ async function loadEngines() {
 }
 
 function renderEngineList() {
-  // NOTE: `.engine-row` is a <div>, not a <button> — Task 4 adds a second,
-  // separate "Compare" <button> inside this row once that engine has a
-  // result, and HTML forbids nesting <button> inside <button>. The row's
-  // own select/deselect behavior lives on `.engine-select-btn` below.
   const container = document.getElementById("engine-list");
   container.innerHTML = "";
   state.engines.forEach((name) => {
+    const reason = engineDisabledReason(name);
     const row = document.createElement("div");
-    row.className = "engine-row";
+    row.className = "engine-row" + (reason ? " disabled" : "");
 
     const selectBtn = document.createElement("button");
     selectBtn.type = "button";
     selectBtn.className = "engine-select-btn";
+    selectBtn.disabled = !!reason;
     selectBtn.setAttribute("aria-pressed", state.selected.has(name));
 
     const box = document.createElement("div");
@@ -54,16 +64,66 @@ function renderEngineList() {
     selectBtn.addEventListener("click", () => toggleEngine(name));
     row.appendChild(selectBtn);
 
-    if (state.results[name]) {
-      const compareBtn = document.createElement("button");
-      compareBtn.type = "button";
-      compareBtn.className = "compare-toggle-btn" + (state.compare.has(name) ? " active" : "");
-      compareBtn.textContent = "Compare";
-      compareBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleCompare(name); });
-      row.appendChild(compareBtn);
+    if (reason) {
+      const note = document.createElement("span");
+      note.className = "engine-note";
+      note.textContent = reason;
+      row.appendChild(note);
     }
-
     container.appendChild(row);
+  });
+}
+
+// Sidebar "Results" list: which finished results are shown in the main area.
+function renderResultsList() {
+  const section = document.getElementById("results-section");
+  const list = document.getElementById("results-list");
+  list.innerHTML = "";
+  const names = state.engines.filter((n) => state.results[n]);
+  section.hidden = !state.file;
+  if (!state.file) return;
+
+  const addRow = (label, color, meta, isOn, onToggle, isError) => {
+    const row = document.createElement("div");
+    row.className = "result-row" + (isError ? " failed" : "");
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "view-toggle" + (isOn ? " on" : "");
+    toggle.textContent = isError ? "Failed" : isOn ? "On" : "Off";
+    toggle.disabled = !!isError;
+    toggle.setAttribute("aria-pressed", !!isOn);
+    toggle.setAttribute("aria-label", `Show ${label}`);
+    if (!isError) toggle.addEventListener("click", onToggle);
+    const text = document.createElement("div");
+    text.className = "result-text";
+    const title = document.createElement("div");
+    title.className = "result-title";
+    if (color) title.appendChild(colorDot(label, 9));
+    title.appendChild(document.createTextNode(label));
+    const sub = document.createElement("div");
+    sub.className = "result-meta";
+    sub.textContent = meta;
+    sub.title = meta;
+    text.appendChild(title);
+    text.appendChild(sub);
+    row.appendChild(toggle);
+    row.appendChild(text);
+    list.appendChild(row);
+  };
+
+  addRow("Original", false, state.file.name, state.showOriginal, () => {
+    state.showOriginal = !state.showOriginal;
+    renderResultsGrid();
+  }, false);
+
+  names.forEach((name) => {
+    const r = state.results[name];
+    if (!r.ok) {
+      addRow(name, true, r.error || "Failed", false, null, true);
+      return;
+    }
+    const boxes = r.pages.length ? r.pages[0].boxes.length : 0;
+    addRow(name, true, `${boxes} boxes · ${r.elapsed_ms} ms`, state.visible.has(name), () => toggleVisible(name), false);
   });
 }
 
@@ -84,7 +144,7 @@ function setRunStatus(msg, isError) {
 
 async function runAll() {
   if (!state.file) { setRunStatus("Choose a file first.", true); return; }
-  if (state.selected.size === 0) { setRunStatus("Select at least one engine.", true); return; }
+  if (state.selected.size === 0) { setRunStatus("Tick at least one engine to run.", true); return; }
   const btn = document.getElementById("run-all-btn");
   const label = btn.textContent;
   btn.disabled = true;
@@ -95,9 +155,9 @@ async function runAll() {
   const tick = () => {
     const secs = Math.round((Date.now() - startedAt) / 1000);
     setRunStatus(`Running ${Array.from(state.running).join(", ")}… ${secs}s`, false);
-    renderResultsGrid();
   };
   tick();
+  renderResultsGrid();
   runTimer = setInterval(tick, 1000);
   try {
     const formData = new FormData();
@@ -114,9 +174,8 @@ async function runAll() {
     try { data = await resp.json(); } catch (e) { throw new Error("Server returned a non-JSON response."); }
     data.results.forEach((r) => {
       state.results[r.engine] = r;
-      if (r.ok && state.compare.size < 3) state.compare.add(r.engine);
+      if (r.ok) state.visible.add(r.engine); else state.visible.delete(r.engine);
     });
-    renderEngineList();
     setRunStatus("", false);
   } catch (e) {
     setRunStatus(e && e.message ? e.message : "Request failed.", true);
@@ -129,12 +188,8 @@ async function runAll() {
   }
 }
 
-function toggleCompare(name) {
-  if (state.compare.has(name)) {
-    state.compare.delete(name);
-  } else if (state.compare.size < 3) {
-    state.compare.add(name);
-  }
+function toggleVisible(name) {
+  if (state.visible.has(name)) state.visible.delete(name); else state.visible.add(name);
   renderResultsGrid();
 }
 
@@ -169,50 +224,80 @@ function renderRunningCard(name) {
   return card;
 }
 
+function originalSrc() {
+  if (state.originalUrl) return state.originalUrl;
+  // PDFs: borrow the first page image any finished engine rendered.
+  for (const n of state.engines) {
+    const r = state.results[n];
+    if (r && r.ok && r.pages.length && r.pages[0].image_base64) return `data:image/png;base64,${r.pages[0].image_base64}`;
+  }
+  return null;
+}
+
+function renderOriginalPanel() {
+  const panel = document.createElement("section");
+  panel.className = "engine-panel";
+  const header = document.createElement("div");
+  header.className = "panel-header";
+  const nameEl = document.createElement("span");
+  nameEl.style.cssText = "font-size:14px;font-weight:600;";
+  nameEl.textContent = "Original";
+  const stats = document.createElement("div");
+  stats.className = "panel-stats mono";
+  stats.textContent = state.file ? state.file.name : "";
+  header.appendChild(nameEl);
+  header.appendChild(stats);
+  panel.appendChild(header);
+
+  const src = originalSrc();
+  if (!src) {
+    const note = document.createElement("div");
+    note.className = "panel-note";
+    note.textContent = "Preview appears once an engine that renders pages has run.";
+    panel.appendChild(note);
+    return panel;
+  }
+  const wrap = document.createElement("div");
+  wrap.className = "page-image-wrap";
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = "Original page";
+  wrap.appendChild(img);
+  panel.appendChild(wrap);
+  return panel;
+}
+
 function renderResultsGrid() {
   const grid = document.getElementById("results-grid");
   grid.innerHTML = "";
-  const allNames = Array.from(state.compare);
+  renderResultsList();
 
-  if (state.running.size > 0) {
-    grid.style.display = "grid";
-    grid.style.gap = "16px";
-    grid.style.gridTemplateColumns = "repeat(auto-fit, minmax(240px, 1fr))";
-    state.running.forEach((name) => grid.appendChild(renderRunningCard(name)));
-    renderDetections();
-    return;
+  const shown = state.engines.filter((n) => state.visible.has(n) && state.results[n] && !state.running.has(n));
+  const running = state.engines.filter((n) => state.running.has(n));
+  const hasResults = Object.keys(state.results).length > 0;
+
+  if (state.layoutMode === "overlay") {
+    grid.className = "results-block";
+    const names = shown.filter((n) => state.results[n].ok);
+    if (names.length > 0) grid.appendChild(renderOverlayPanel(names));
+  } else {
+    grid.className = "results-row";
+    if (state.file && state.showOriginal) grid.appendChild(renderOriginalPanel());
+    running.forEach((name) => grid.appendChild(renderRunningCard(name)));
+    shown.forEach((name) => grid.appendChild(renderPanel(name, state.results[name])));
   }
-  if (allNames.length === 0) {
-    grid.style.display = "block";
+
+  if (grid.children.length === 0 || (state.layoutMode !== "overlay" && !state.file)) {
+    grid.innerHTML = "";
+    grid.className = "results-block";
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    const hasResults = Object.keys(state.results).length > 0;
     empty.textContent = !state.file
-      ? "Upload an image, tick the engines you want, then press Run all engines."
+      ? "Upload an image or PDF, tick the engines to run, then press Run selected."
       : hasResults
-        ? "Press Compare next to an engine (up to 3) to see its result here."
-        : "Tick the engines you want, then press Run all engines. Slow engines such as Surya can take a minute or more.";
+        ? "Nothing is shown. Turn a result On in the Results list."
+        : "Tick the engines to run, then press Run selected. Slow engines such as Surya can take a minute or more.";
     grid.appendChild(empty);
-    renderDetections();
-    return;
-  }
-  if (allNames.length > 0) {
-    if (state.layoutMode === "side-by-side") {
-      grid.style.display = "grid";
-      grid.style.gap = "16px";
-      grid.style.gridTemplateColumns = `repeat(${allNames.length}, minmax(0, 1fr))`;
-      allNames.forEach((name) => {
-        const result = state.results[name];
-        if (!result) return;
-        grid.appendChild(renderPanel(name, result));
-      });
-    } else {
-      const names = allNames.filter((n) => state.results[n] && state.results[n].ok);
-      if (names.length > 0) {
-        grid.style.display = "block";
-        grid.appendChild(renderOverlayPanel(names));
-      }
-    }
   }
   renderDetections();
 }
@@ -229,7 +314,7 @@ function renderDetections() {
   tabsEl.innerHTML = "";
   rowsEl.innerHTML = "";
 
-  const names = Array.from(state.compare).filter((n) => state.results[n] && state.results[n].ok);
+  const names = state.engines.filter((n) => state.visible.has(n) && state.results[n] && state.results[n].ok && !state.running.has(n));
   if (names.length === 0) return;
   if (!state.detectionsTab || !names.includes(state.detectionsTab)) {
     state.detectionsTab = names[0];
@@ -482,14 +567,18 @@ function drawBoxes(svg, boxes, color) {
 }
 
 function handleFileChosen(file) {
+  if (state.originalUrl) URL.revokeObjectURL(state.originalUrl);
   state.file = file;
+  state.originalUrl = file.type && file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
   const chip = document.getElementById("file-chip");
   const nameEl = document.getElementById("file-name");
   chip.hidden = false;
   nameEl.textContent = file.name;
   state.results = {};
-  state.compare.clear();
+  state.visible.clear();
+  state.showOriginal = true;
   state.detectionsTab = null;
+  state.engines.forEach((n) => { if (engineDisabledReason(n)) state.selected.delete(n); });
   setRunStatus("", false);
   renderEngineList();
   renderResultsGrid();
