@@ -59,3 +59,30 @@ def test_parse_datalab_json_keeps_original_html_on_boxes():
     list_box = next(b for b in page.boxes if "Master stillness" in b.text)
     assert list_box.html.startswith("<ol")
     assert "<li>" in list_box.html
+
+
+def test_parse_datalab_json_keeps_pictures_with_alt_text_and_crop():
+    data = {
+        "children": [
+            {
+                "block_type": "Page",
+                "children": [
+                    {
+                        "block_type": "Picture",
+                        "bbox": [10, 20, 110, 220],
+                        "html": '<img alt="Eddie Wu" src="a.jpg"/><div class="img-description"><div class="img-alt">Eddie Wu</div></div>',
+                        "images": {"a.jpg": "QUJD"},
+                    },
+                    {"block_type": "Text", "bbox": [10, 230, 110, 250], "html": "<p>Caption text</p>"},
+                ],
+            }
+        ]
+    }
+    page = parse_datalab_json(data)[0]
+
+    picture = page.boxes[0]
+    assert picture.region_type == "Picture"
+    assert picture.text == "Eddie Wu"
+    assert picture.image == "QUJD"
+    assert (picture.x0, picture.y0, picture.x1, picture.y1) == (10.0, 20.0, 110.0, 220.0)
+    assert page.text == "Caption text"  # picture alt text stays out of the page text

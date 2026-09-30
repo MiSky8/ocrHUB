@@ -140,6 +140,9 @@ Each `<engine>.json` holds the extracted text, and per page the boxes
 - **pdfplumber:** one box per text line with the PDF's real font in `style`
   (font, size, bold, italic, colour, and per-run styles); detected tables are
   `Table` boxes with `html`.
+- **Pictures (Datalab, pdfplumber):** `region_type: "Picture"` boxes with the
+  cropped image as base64 JPEG in `image`; Datalab also gives its alt
+  text/caption in `text`. Tesseract and Surya don't detect pictures.
 - **Tesseract:** one box per line, with the individual words (and their
   confidences) nested in `words`; page confidence is the mean word confidence.
 

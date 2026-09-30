@@ -161,33 +161,43 @@ async function runAll() {
   tick();
   renderResultsGrid();
   runTimer = setInterval(tick, 1000);
-  try {
-    const formData = new FormData();
-    formData.append("file", state.file);
-    state.selected.forEach((name) => formData.append("engines", name));
-
-    const resp = await fetch("/ocr", { method: "POST", body: formData });
-    if (!resp.ok) {
-      let detail = "";
-      try { detail = (await resp.json()).detail || ""; } catch (e) { /* non-JSON body */ }
-      throw new Error(`Request failed (${resp.status})${typeof detail === "string" && detail ? ": " + detail : ""}`);
+  // One request per engine, in parallel, so a fast engine's result shows up as
+  // soon as it is done instead of waiting for the slowest one (Surya can take minutes).
+  const errors = [];
+  const runOne = async (name) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", state.file);
+      formData.append("engines", name);
+      const resp = await fetch("/ocr", { method: "POST", body: formData });
+      if (!resp.ok) {
+        let detail = "";
+        try { detail = (await resp.json()).detail || ""; } catch (e) { /* non-JSON body */ }
+        throw new Error(`Request failed (${resp.status})${typeof detail === "string" && detail ? ": " + detail : ""}`);
+      }
+      let data;
+      try { data = await resp.json(); } catch (e) { throw new Error("Server returned a non-JSON response."); }
+      data.results.forEach((r) => {
+        state.results[r.engine] = r;
+        if (r.ok) state.visible.add(r.engine); else state.visible.delete(r.engine);
+      });
+    } catch (e) {
+      state.results[name] = { engine: name, ok: false, text: "", pages: [], elapsed_ms: 0, error: e && e.message ? e.message : "Request failed." };
+      state.visible.delete(name);
+      errors.push(`${name}: ${state.results[name].error}`);
+    } finally {
+      state.running.delete(name);
+      renderResultsGrid();
     }
-    let data;
-    try { data = await resp.json(); } catch (e) { throw new Error("Server returned a non-JSON response."); }
-    data.results.forEach((r) => {
-      state.results[r.engine] = r;
-      if (r.ok) state.visible.add(r.engine); else state.visible.delete(r.engine);
-    });
-    setRunStatus("", false);
-  } catch (e) {
-    setRunStatus(e && e.message ? e.message : "Request failed.", true);
-  } finally {
-    clearInterval(runTimer);
-    state.running = new Set();
-    renderResultsGrid();
-    btn.disabled = false;
-    btn.textContent = label;
-  }
+  };
+
+  await Promise.all(Array.from(state.selected).map(runOne));
+  clearInterval(runTimer);
+  setRunStatus(errors.join(" · "), errors.length > 0);
+  state.running = new Set();
+  renderResultsGrid();
+  btn.disabled = false;
+  btn.textContent = label;
 }
 
 function toggleVisible(name) {
@@ -368,8 +378,9 @@ function renderDetections() {
 
     const text = document.createElement("div");
     text.style.cssText = "white-space:normal;overflow-wrap:anywhere;";
-    text.textContent = box.text;
-    text.title = box.text;
+    const label = box.text || (box.region_type === "Picture" ? "(picture)" : "");
+    text.textContent = label;
+    text.title = label;
 
     const conf = document.createElement("div");
     if (box.confidence !== null && box.confidence !== undefined) {
@@ -694,7 +705,34 @@ function drawBoxes(svg, boxes, color, inPlace = false) {
       g.appendChild(rect);
     }
 
-    if (state.show.text && inPlace && box.html) {
+    if (state.show.text && inPlace && box.region_type === "Picture") {
+      // Pictures: the cropped image if the engine provided one, else a labelled placeholder.
+      const w = Math.max(box.x1 - box.x0, 1);
+      const h = box.y1 - box.y0;
+      if (box.image) {
+        const im = document.createElementNS("http://www.w3.org/2000/svg", "image");
+        im.setAttribute("x", box.x0);
+        im.setAttribute("y", box.y0);
+        im.setAttribute("width", w);
+        im.setAttribute("height", h);
+        im.setAttribute("preserveAspectRatio", "none");
+        im.setAttribute("href", `data:image/jpeg;base64,${box.image}`);
+        g.appendChild(im);
+      } else {
+        const ph = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        ph.setAttribute("x", box.x0);
+        ph.setAttribute("y", box.y0);
+        ph.setAttribute("width", w);
+        ph.setAttribute("height", h);
+        ph.setAttribute("fill", "#e7e5df");
+        g.appendChild(ph);
+      }
+      if (box.text) {
+        const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+        title.textContent = box.text;
+        g.appendChild(title);
+      }
+    } else if (state.show.text && inPlace && box.html) {
       // Engines that return markup (Datalab): render it, so lists and tables
       // keep their structure, at one page-wide body size rather than a per-box fit.
       const w = Math.max(box.x1 - box.x0, 1);

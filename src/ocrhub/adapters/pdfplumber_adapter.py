@@ -1,3 +1,4 @@
+import base64
 import html
 import io
 import re
@@ -148,29 +149,85 @@ def _table_boxes(page) -> list[BoxResult]:
     return boxes
 
 
+def _split_columns(chars: list[dict]) -> list[list[dict]]:
+    """Split a text line where the gap between glyphs is wider than 1em: that is
+    a column gutter (or table gap), never a word space. pdfplumber otherwise
+    joins the columns of a multi-column page into one very wide line."""
+    segments: list[list[dict]] = [[]]
+    prev = None
+    for c in chars:
+        if prev is not None and c["text"].strip() and prev["text"].strip():
+            if float(c["x0"]) - float(prev["x1"]) > 1.0 * float(prev.get("size") or 10):
+                segments.append([])
+        segments[-1].append(c)
+        if c["text"].strip():
+            prev = c
+    return [seg for seg in segments if seg]
+
+
+def _runs_text(runs: list[dict]) -> str:
+    text = ""
+    for i, run in enumerate(runs):
+        if i and run["x0"] - runs[i - 1]["x1"] > 0.12 * (run["size"] or 10):
+            text += " "
+        text += run["text"]
+    return text
+
+
+def _picture_boxes(page) -> list[BoxResult]:
+    boxes: list[BoxResult] = []
+    for img in page.images:
+        bbox = (float(img["x0"]), float(img["top"]), float(img["x1"]), float(img["bottom"]))
+        if bbox[2] - bbox[0] < 4 or bbox[3] - bbox[1] < 4:
+            continue
+        image = None
+        try:
+            crop = page.crop(
+                (max(bbox[0], 0), max(bbox[1], 0), min(bbox[2], page.width), min(bbox[3], page.height))
+            )
+            buf = io.BytesIO()
+            crop.to_image(resolution=96).original.convert("RGB").save(buf, format="JPEG", quality=70)
+            image = base64.b64encode(buf.getvalue()).decode("ascii")
+        except Exception:  # noqa: BLE001 - the crop is a nicety; the region is still reported
+            pass
+        boxes.append(
+            BoxResult(text="", x0=bbox[0], y0=bbox[1], x1=bbox[2], y1=bbox[3], region_type="Picture", image=image)
+        )
+    return boxes
+
+
 def _page_boxes(page) -> list[BoxResult]:
     visible_page = page.filter(lambda o: o.get("object_type") != "char" or o.get("size", 1) >= _MIN_SIZE)
     tables = _table_boxes(visible_page)
     table_bboxes = [(t.x0, t.y0, t.x1, t.y1) for t in tables]
 
-    boxes: list[BoxResult] = list(tables)
+    boxes: list[BoxResult] = list(tables) + _picture_boxes(page)
     for line in visible_page.extract_text_lines(return_chars=True):
-        text = line["text"].replace(_BLANK, "").strip()
-        if not text:
-            continue
-        bbox = (float(line["x0"]), float(line["top"]), float(line["x1"]), float(line["bottom"]))
-        if bbox[1] < 0 or bbox[3] > page.height:  # glyphs positioned off the page
-            continue
-        if any(_inside(bbox, tb) for tb in table_bboxes):
-            continue
-        style = _dominant_style(line["chars"])
-        style["runs"] = _runs(line["chars"])
-        boxes.append(
-            BoxResult(
-                text=text, x0=bbox[0], y0=bbox[1], x1=bbox[2], y1=bbox[3],
-                region_type="Text", style=style,
+        for chars in _split_columns(line["chars"]):
+            vis = _visible(chars)
+            if not vis:
+                continue
+            bbox = (
+                min(float(c["x0"]) for c in vis),
+                float(line["top"]),
+                max(float(c["x1"]) for c in vis),
+                float(line["bottom"]),
             )
-        )
+            if bbox[1] < 0 or bbox[3] > page.height:  # glyphs positioned off the page
+                continue
+            if any(_inside(bbox, tb) for tb in table_bboxes):
+                continue
+            style = _dominant_style(chars)
+            style["runs"] = _runs(chars)
+            text = _runs_text(style["runs"]).strip()
+            if not text:
+                continue
+            boxes.append(
+                BoxResult(
+                    text=text, x0=bbox[0], y0=bbox[1], x1=bbox[2], y1=bbox[3],
+                    region_type="Text", style=style,
+                )
+            )
     boxes.sort(key=lambda b: (b.y0, b.x0))
     for order, box in enumerate(boxes):
         box.reading_order = order

@@ -19,6 +19,8 @@ class BoxResult:
     style: dict | None = None
     # Per-word boxes nested in a line box (Tesseract): text, x0..y1, confidence.
     words: list[dict] | None = None
+    # Cropped picture as base64 JPEG, for region_type "Picture" boxes; `text` is its alt text/caption.
+    image: str | None = None
 
 
 @dataclass

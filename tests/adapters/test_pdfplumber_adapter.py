@@ -70,3 +70,23 @@ def test_extract_detects_tables_with_cell_alignment():
     assert "North | 12,450" in tables[0].text
     # cell text must not also appear as free-standing line boxes
     assert not any(b.region_type == "Text" and "12,450" in b.text for b in result.pages[0].boxes)
+
+
+def test_extract_splits_columns_and_reports_pictures(sample_image_bytes):
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=10)
+    pdf.set_xy(10, 20)
+    pdf.cell(60, 6, "Left column text")
+    pdf.set_xy(120, 20)
+    pdf.cell(60, 6, "Right column text")
+    pdf.image(sample_image_bytes, x=10, y=60, w=80)
+    result = PdfplumberAdapter().extract(bytes(pdf.output()), "c.pdf")
+
+    boxes = result.pages[0].boxes
+    texts = [b.text for b in boxes if b.region_type == "Text"]
+    assert texts == ["Left column text", "Right column text"]
+    picture = next(b for b in boxes if b.region_type == "Picture")
+    assert picture.image and picture.x1 - picture.x0 > 50

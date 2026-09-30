@@ -6,10 +6,10 @@ import time
 from ocrhub.adapters._text import html_to_text
 from ocrhub.models import BoxResult, OcrResult, PageResult
 
-# "Page" wraps every top-level block and carries no text of its own; "Picture" has
-# no text either (it's an image region). Both are skipped so we don't emit an empty
-# box for them, but their children are still walked.
-_SKIP_TYPES = frozenset({"Page", "Picture"})
+# "Page" wraps every top-level block and carries no text of its own, so it is skipped
+# (its children are still walked). Pictures are kept as image boxes, see _picture_box.
+_SKIP_TYPES = frozenset({"Page"})
+_PICTURE_TYPES = frozenset({"Picture", "Figure"})
 
 _BLOCK_TYPE_MAP: dict[str, str] = {
     "SectionHeader": "Title",
@@ -29,9 +29,35 @@ def _map_block_type(block_type: str) -> str:
     return _BLOCK_TYPE_MAP.get(block_type, "Text")
 
 
+def _picture_box(block: dict, order: int) -> BoxResult | None:
+    """A Picture/Figure block: its region, its alt text/caption (`text`) and the
+    cropped image Datalab extracted (first entry of the block's `images`)."""
+    bbox = block.get("bbox")
+    if not bbox or len(bbox) != 4:
+        return None
+    try:
+        x0, y0, x1, y1 = (float(v) for v in bbox)
+    except (TypeError, ValueError):
+        return None
+    images = block.get("images") or {}
+    return BoxResult(
+        text=html_to_text(block.get("html") or ""),
+        x0=x0, y0=y0, x1=x1, y1=y1,
+        reading_order=order,
+        region_type="Picture",
+        image=next(iter(images.values()), None),
+    )
+
+
 def _walk(block: dict, counter: "itertools.count[int]") -> list[BoxResult]:
     boxes: list[BoxResult] = []
     block_type = block.get("block_type", "")
+
+    if block_type in _PICTURE_TYPES:
+        picture = _picture_box(block, next(counter))
+        if picture:
+            boxes.append(picture)
+        return boxes
 
     if block_type in _SKIP_TYPES:
         for child in block.get("children") or []:
@@ -72,7 +98,7 @@ def parse_datalab_json(data: dict) -> list[PageResult]:
     for i, page_block in enumerate(data.get("children", []), start=1):
         counter: "itertools.count[int]" = itertools.count()
         boxes = _walk(page_block, counter)
-        text = "\n\n".join(b.text for b in boxes)
+        text = "\n\n".join(b.text for b in boxes if b.region_type != "Picture")
         pages.append(PageResult(page_number=i, text=text, boxes=boxes))
     return pages
 
