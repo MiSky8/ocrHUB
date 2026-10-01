@@ -97,6 +97,9 @@ redirects on POST should target `/mcp/` directly.
 | DeepSeek (via Ollama) | self-hosted vision model | set `OLLAMA_HOST` | point at your own Ollama instance, runs natively outside this container |
 | Datalab | hosted API | `ENGINES=datalab` + set `DATALAB_API_KEY` | paid, has a free monthly tier - see [datalab.to](https://www.datalab.to) |
 
+See [docs/visualisations.md](docs/visualisations.md) for how the dashboard
+draws each engine's output and what each one does and doesn't return.
+
 ## Build args
 
 `ENGINES` is a comma-separated list of optional extras to install at

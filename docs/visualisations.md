@@ -1,0 +1,258 @@
+# How the dashboard visualises each OCR engine
+
+The dashboard at <http://localhost:8000> runs the engines you tick on one
+file and shows their results side by side. Every engine returns the same
+shape (`OcrResult` > pages > boxes, see `src/ocrhub/models.py`), but they
+return very different amounts of detail. The dashboard draws whatever each
+engine actually provides and does not invent the rest. This page describes
+what each engine gives you, how it is drawn, and where it falls short.
+
+Screenshot spots are marked `<!-- screenshot: ... -->`.
+
+## Contents
+
+1. [The dashboard](#the-dashboard)
+2. [What each engine returns](#what-each-engine-returns)
+3. [pdfplumber](#pdfplumber)
+4. [Tesseract](#tesseract)
+5. [Surya](#surya)
+6. [Datalab](#datalab)
+7. [Behaviour shared by all engines](#behaviour-shared-by-all-engines)
+8. [Demo files](#demo-files)
+9. [Known limitations and untested parts](#known-limitations-and-untested-parts)
+
+## The dashboard
+
+<!-- screenshot: full dashboard with two or three engines on the receipt photo -->
+
+- **Sidebar:** upload a file, tick the engines to run, and choose which
+  finished results are shown.
+- **Side by side:** one panel per engine, plus the original. Each panel
+  draws that engine's boxes on the page.
+- **Overlay:** all engines' boxes drawn on top of one page image, each in
+  its own colour (tesseract blue, surya orange, paddleocr purple, datalab
+  green, pdfplumber grey). The image used is the first engine's page image;
+  boxes from engines that measured a different image size are rescaled to it.
+- **Show toggles:** *Boxes* (outlines), *Text* (the recognised text drawn at
+  the box position) and *Order numbers* (reading-order badges).
+- **Detections table:** one tab per engine, listing order, text,
+  confidence and box (x, y, w, h), sorted by the reading order the engine
+  reported where there is one. Engines with no boxes fall back to their
+  text lines.
+
+Each ticked engine is sent as its own request, so a fast engine such as
+pdfplumber appears immediately while Surya is still running.
+
+## What each engine returns
+
+| | pdfplumber | Tesseract | Surya | Datalab |
+|---|---|---|---|---|
+| Input | PDF only (text layer) | image or PDF | image or PDF | image or PDF |
+| Is it OCR? | no, reads the PDF's text layer | yes | yes | yes (hosted API) |
+| Box granularity | text line (split at column gaps) | line, with words nested | line | layout block (paragraph, list, table, heading...) |
+| Reading order | yes, but geometric (top to bottom, left to right) | yes, from Tesseract's block/paragraph/line numbers | **no** | yes, from the engine |
+| Confidence | no | per word, per line, per page | per line, per page | no |
+| Region types | Text, Table, Picture | none | none | Title, Text, Table, Figure/Picture, Caption, Header, Footer |
+| Fonts and colours | yes: font, size, bold, italic, colour, per run | no | no | no (sizes are estimated, see below) |
+| Tables | real tables with cell alignment | no | no | yes, as html |
+| Pictures | cropped image | no | no | cropped image plus alt text |
+| Original markup kept | no | no | no | yes: `html` per box and the untouched `raw` response |
+| Page image in result | no | yes | yes | no |
+| Coordinates | PDF points (about 595 wide for A4) | pixels | pixels | pixels (about 1600 wide in our tests) |
+
+The coordinate differences matter for visualisation: the same page has
+different box numbers for each engine, so the dashboard sizes order badges
+and fonts from each page's own coordinate space.
+
+## pdfplumber
+
+pdfplumber does not recognise anything. It reads the characters already
+embedded in a born-digital PDF, so it is fast (under a second) and exact,
+and it is the reference the other engines can be compared against.
+Code: `src/ocrhub/adapters/pdfplumber_adapter.py`.
+
+<!-- screenshot: pdfplumber on the born-digital PDF, Text on, Boxes on -->
+
+**What the dashboard shows**
+
+- **Real fonts, sizes and colours.** Each line is split into *runs* of one
+  style (for example a bold `Date:` followed by regular text). Each run is
+  drawn at its own x position with the PDF's real font size, weight, italic
+  and colour. The browser's font is not the PDF's, so each run is stretched
+  to the run's measured width (`textLength`). Hovering a run shows
+  `font size`.
+- **Tables.** `find_tables()` locates tables; each becomes one `Table` box
+  with `html` built from the cells. Characters are assigned to cells by
+  their centre point, because table row edges do not always enclose their
+  text. Cell alignment (left, centre, right) is inferred from the gaps
+  inside the cell, and mostly bold cells are rendered bold. Lines inside a
+  table are not repeated as separate text boxes.
+- **Column splitting.** pdfplumber joins the columns of a multi-column page
+  into one very wide line. A gap wider than 1em between glyphs is treated as
+  a column gutter, so each column becomes its own box.
+- **Pictures.** Embedded images are cropped from the page at 96 dpi and
+  drawn in place.
+- **Invisible text.** Characters under 1pt and braille-blank padding
+  characters are dropped, and so are glyphs positioned off the page.
+
+**Quirks**
+
+- The reading order is a sort by position (top, then left), not the PDF's
+  internal content order. On a two-column page the order badges therefore
+  run across the columns, not down each one.
+- No page image and no confidence. For a PDF, the Original panel borrows a
+  page image from another engine that ran (for example Tesseract); with
+  pdfplumber alone it draws on a blank page sized to the PDF.
+- Scanned PDFs have no text layer, so pdfplumber returns nothing useful.
+
+## Tesseract
+
+The classic baseline. Code: `src/ocrhub/adapters/tesseract_adapter.py`.
+
+<!-- screenshot: tesseract on the receipt photo, boxes + order numbers -->
+
+**What the dashboard shows**
+
+- **One box per line**, built from Tesseract's word-level data. Words that
+  share a block, paragraph and line number are grouped. The words stay
+  nested inside the box, each with its own box and confidence.
+- **Reading order** is the order Tesseract reported the lines in.
+- **Confidence.** Each line's confidence is the mean of its word
+  confidences, and the page confidence is the mean over all words. Words
+  with confidence -1 (no value) are ignored.
+- The page image is returned with the result (PDFs are rasterised first),
+  so Tesseract is the usual source of the background image in the Overlay
+  view and the Original panel.
+- The text is drawn in place at the line's position, scaled to fit the box.
+
+**Quirks**
+
+- No region types, so headings, tables and lists are not distinguished:
+  everything is a line of text.
+- It does not handle multi-column layouts or photos as well as the
+  layout-aware engines, and its order follows its own block detection.
+
+## Surya
+
+A modern OCR model with line detection and recognition.
+Code: `src/ocrhub/adapters/surya_adapter.py`.
+
+<!-- screenshot: surya on the receipt photo -->
+
+**What the dashboard shows**
+
+- **One box per recognised line**, with a confidence (scaled to 0-100) and
+  the page image.
+- Surya's output can contain inline markup; it is stripped to plain text,
+  keeping table cells as ` | ` and list items on separate lines.
+
+**Quirks**
+
+- **No reading order.** There are no order badges for Surya, and its
+  detections tab is in the order the model returned the lines.
+- **Layout and table models are not used.** Only detection and recognition
+  run, so there are no region types and no tables.
+- **Maths output.** Surya sometimes outputs LaTeX, such as `\triangle`, in
+  place of the characters it sees.
+- **Page confidence scale.** Line confidences are shown 0-100, but the page
+  confidence in the saved JSON is the unscaled 0-1 mean.
+- **Slow and memory-hungry.** About 1.5 minutes for a simple page and 12
+  minutes for a dense newspaper page, with 5+ GB of memory. A big photo was
+  once OOM-killed; batch sizes are now capped (recognition 8, detector 1,
+  peak about 5.6 GB). See the README's memory section.
+
+## Datalab
+
+A hosted document-conversion API that returns a tree of layout blocks.
+Code: `src/ocrhub/adapters/datalab_adapter.py`.
+
+<!-- screenshot: datalab on the newspaper, Text on -->
+
+**What the dashboard shows**
+
+- **One box per block**, in the reading order Datalab gives. The `Page`
+  wrapper is skipped, and each block's type is mapped to a region type:
+  `SectionHeader` -> Title, `Table`, `Caption`, `PageHeader` -> Header,
+  `PageFooter` -> Footer, `ListGroup`/`ListItem`/`Footnote`/`Text` -> Text.
+- **Markup is rendered, not flattened.** Each box keeps its original `html`,
+  so lists, tables and bullets are drawn with their structure. The html goes
+  through an allowlist sanitiser that rebuilds only known tags and drops
+  every attribute except table spans. The plain `text` field is built from
+  the html with bullets and numbers restored and one line per table row; a
+  bullet is not added twice when Datalab already put one in the item text.
+- **Font sizes come from box geometry.** Datalab gives no font information,
+  so the size is estimated from the box: a single line is about 1.1x the
+  font size tall, and each extra wrapped line adds about 1.75x (font plus
+  leading). The estimate solves that for the largest font whose wrapped
+  text fits the box. Tables use the page's body size (the median over its
+  plain text blocks) because table boxes are padded and say nothing about
+  their font, and estimates within about 30% of body size are snapped to it,
+  since they are measurement noise.
+- **Pictures** are drawn from the cropped image Datalab extracted, with its
+  alt text or caption as the hover title.
+- **Saved extras.** The result keeps the untouched block tree in `raw` for
+  anyone using `data/output/<hash>/datalab.json` directly. It is not sent
+  to the dashboard.
+
+**Quirks**
+
+- Datalab reports no page image or page size, so the dashboard draws on a
+  blank page sized to the boxes' extent.
+- Datalab itself returned "Important Notice" as the fourth item of a list
+  on one document, as a list item and not a heading. That came from Datalab,
+  not from the dashboard's rendering.
+- It is a paid hosted service (free monthly tier), and takes 10 s to
+  2.5 min in our tests depending on its queue.
+
+## Behaviour shared by all engines
+
+- **Order badges** are sized from the page's coordinate space
+  (`max(15, 3% of page width)`), so they stay legible on a 595-point PDF and
+  a 1600-pixel image alike. They are shown only for boxes that have a
+  reading order, which is why Surya has none.
+- **Draw priority inside a box** (`drawBoxes` in `web/static/app.js`):
+  Picture image, else rendered html (Datalab), else styled runs
+  (pdfplumber), else plain text fitted to the box (Tesseract, Surya).
+- **Image normalisation.** Uploads are normalised before any engine sees
+  them: EXIF rotation applied (phone photos are stored sideways), flattened
+  to RGB, longest side capped at 3000 px, re-encoded as PNG. This fixed
+  iPhone MPO photos and sideways pages. The original stays untouched in
+  `data/input`. HEIC is not supported yet; export to JPEG first.
+- **Results are cached on disk.** Each result is saved to
+  `data/output/<hash>/<engine>.json`, keyed by the SHA-256 of the file, and
+  the dashboard shows the cached result when it exists. After changing an
+  adapter, **old files keep showing the old behaviour**. Delete
+  `data/output/<hash>/<engine>.json` or send `refresh=true` on `/ocr`. The
+  dashboard has no refresh button yet.
+- **Errors are per engine.** A failing or missing engine shows its own
+  error and the others still render.
+
+## Demo files
+
+Files used to try the dashboard (kept in `data/input`):
+
+| File | What it shows |
+|---|---|
+| Born-digital PDF | pdfplumber at its best: exact text, fonts, colours, tables, columns, pictures; a reference for the OCR engines |
+| Receipt photo (iPhone JPEG) | Image normalisation (rotation, MPO); a hard case for Tesseract and Surya; Datalab's output on it was a mess and has not been reviewed |
+| German newspaper PDF | Dense multi-column layout; column splitting in pdfplumber; Surya is slow here (12 min) |
+
+<!-- screenshot: the three demo files, one engine each -->
+
+A richer test document (footnotes, nested lists, two columns, a second
+page) made from markdown is still wanted, to exercise Datalab's structure
+and pdfplumber's column splitting.
+
+## Known limitations and untested parts
+
+- **Not tested:** the Overlay view, PaddleOCR and the Ollama (DeepSeek)
+  engine. They are registered and listed, but their visualisation has not
+  been checked, so nothing above should be assumed for them. (From earlier
+  testing, PaddleOCR does not report a reading order, like Surya.)
+- **HEIC** uploads are unsupported.
+- **No refresh button** in the UI to bypass the cache.
+- **Surya:** emits LaTeX such as `\triangle`; layout and table models are
+  unused.
+- **Datalab on the receipt photo** needs a look.
+- Only Datalab, pdfplumber and Tesseract report reading order, so order
+  badges and the detections sort are only meaningful for them.
