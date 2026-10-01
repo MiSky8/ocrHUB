@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.0.0 (2026-10-01)
+## 0.1.0 (2026-10-01)
 
-First release.
+First release. Version 0.1.0 matches `pyproject.toml`.
 
 ### Included
 - Four engines behind one API: Tesseract 5.5.0, pdfplumber 0.11.9, Surya 0.14.7
