@@ -22,15 +22,16 @@ Want to know what each engine can and can't do? See the
 
 ## Included engines
 
-| Engine | Version in this image | What it gives you | Runs |
+| Engine | Version | What it gives you | Runs |
 |---|---|---|---|
 | Tesseract | 5.5.0 (pytesseract 0.3.13) | text, per-word confidence, line boxes | local, always included |
 | pdfplumber | 0.11.9 | the text layer of born-digital PDFs: fonts, colours, tables | local, always included |
 | Surya | 0.14.7 (models: detection 2025-05-07, recognition 2025-05-16, layout and tables 2025-02-18) | line OCR, layout regions, reading order, tables | local, add with `ENGINES=surya` |
 | Datalab | hosted API (`datalab-python-sdk` 0.5.0, mode `accurate`) | layout blocks, html tables, pictures | cloud, add with `ENGINES=datalab` and a `DATALAB_API_KEY` (paid, free monthly tier: [datalab.to](https://www.datalab.to)) |
 
-These are the versions in the current image. Surya is pinned to 0.14.7; the
-others follow what the image build installs. [docs/visualisations.md](docs/visualisations.md)
+These are the versions in an image built with all engines. The published image
+has only Tesseract and pdfplumber. Surya is pinned to 0.14.7; the others follow
+what the image build installs. [docs/visualisations.md](docs/visualisations.md)
 explains what each engine returns, how the dashboard draws it, and why newer
 Surya releases aren't used yet.
 
