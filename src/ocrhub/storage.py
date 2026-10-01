@@ -1,11 +1,15 @@
 import hashlib
 import json
+import logging
 import os
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ocrhub.models import BoxResult, OcrResult, PageResult
+
+
+logger = logging.getLogger(__name__)
 
 
 def content_hash(file_bytes: bytes) -> str:
@@ -77,6 +81,23 @@ class ResultStore:
             )
 
 
+def _warn_if_unwritable(root: Path) -> None:
+    """Say so at startup if results can't be saved, instead of failing quietly later."""
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        probe = root / ".write-test"
+        probe.write_text("")
+        probe.unlink()
+    except OSError as exc:
+        who = f" (the app runs as user {os.getuid()})" if hasattr(os, "getuid") else ""
+        logger.warning(
+            "Data folder %s is not writable%s: results will be returned but not saved or cached. "
+            "On Linux, run: sudo chown -R 1000:1000 <your data folder>. Error: %s",
+            root, who, exc,
+        )
+
+
 def build_store() -> ResultStore:
-    root = os.environ.get("OCRHUB_DATA_DIR", str(Path.home() / "data"))
+    root = Path(os.environ.get("OCRHUB_DATA_DIR", str(Path.home() / "data")))
+    _warn_if_unwritable(root)
     return ResultStore(root)

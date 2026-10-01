@@ -105,3 +105,50 @@ def test_process_document_with_store_saves_input_file(tmp_path):
     saved = list((tmp_path / "input").glob("*-f.png"))
     assert len(saved) == 1
     assert saved[0].read_bytes() == b"bytes"
+
+
+class _UnwritableStore(ResultStore):
+    """Stands in for a data folder the app may not write to (a Linux bind mount owned by another user)."""
+
+    def save_input(self, hash_id, filename, file_bytes):
+        raise PermissionError(13, "Permission denied")
+
+    def save(self, hash_id, engine, result):
+        raise PermissionError(13, "Permission denied")
+
+
+def test_unwritable_data_folder_still_returns_results(tmp_path, caplog):
+    store = _UnwritableStore(tmp_path)
+
+    with caplog.at_level("WARNING"):
+        results = process_document(_registry(), b"bytes", "f.png", ["working", "broken"], store)
+
+    by_engine = {r.engine: r for r in results}
+    assert by_engine["working"].ok is True
+    assert by_engine["broken"].ok is False
+    assert "results will not be saved" in caplog.text
+
+
+def test_failure_to_save_one_result_does_not_lose_it(tmp_path, caplog):
+    class SaveFails(ResultStore):
+        def save(self, hash_id, engine, result):
+            raise PermissionError(13, "Permission denied")
+
+    with caplog.at_level("WARNING"):
+        results = process_document(_registry(), b"bytes", "f.png", ["working"], SaveFails(tmp_path))
+
+    assert results[0].ok is True
+    assert "Could not save the working result" in caplog.text
+
+
+def test_unreadable_saved_result_is_recomputed(tmp_path):
+    store = ResultStore(tmp_path)
+    adapter_registry = _registry()
+    process_document(adapter_registry, b"bytes", "f.png", ["working"], store)
+    path = next((tmp_path / "output").glob("*/working.json"))
+    path.write_text("{ not json")
+
+    results = process_document(adapter_registry, b"bytes", "f.png", ["working"], store)
+
+    assert results[0].ok is True
+    assert adapter_registry.get("working").calls == 2

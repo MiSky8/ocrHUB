@@ -10,6 +10,7 @@ comparison into something you can run in one command.
 **Fastest way** - from this folder, with Docker running:
 
 ```bash
+mkdir -p data              # results are saved here; see "Folder permissions" if it fails
 docker compose up --build
 ```
 
@@ -178,9 +179,30 @@ Each `<engine>.json` holds the extracted text, and per page the boxes
 - **Tesseract:** one box per line, with the individual words (and their
   confidences) nested in `words`; page confidence is the mean word confidence.
 
-With plain `docker run`, add `-v "$PWD/data:/home/ocrhub/data"`. On a Linux
-host the folder must be writable by uid 1000 (the container's `ocrhub` user);
-on Docker Desktop for Mac this just works.
+With plain `docker run`, add `-v "$PWD/data:/home/ocrhub/data"` (in
+PowerShell use `${PWD}`, in `cmd` use `%cd%`).
+
+### Folder permissions
+
+The container runs as a normal user, `ocrhub` (user ID 1000), not as root, so
+it can only save results if that user may write to `./data`.
+
+- **macOS (Docker Desktop):** works with no setup. This is where it was
+  tested.
+- **Linux:** create the folder yourself before the first start (`mkdir -p
+  data`). If you don't, Docker creates it owned by root and the app can't
+  write to it. If your account isn't user 1000, give the folder to the
+  container's user: `sudo chown -R 1000:1000 data`. On SELinux systems
+  (Fedora, RHEL) also add `:z` to the volume in `docker-compose.yml`
+  (`./data:/home/ocrhub/data:z`). We haven't tested Linux ourselves.
+- **Windows (Docker Desktop, WSL 2):** Windows folders don't enforce Linux
+  user IDs, so this normally works. Keeping the project inside the WSL
+  filesystem (for example under `~/`) is much faster than under `C:\`. We
+  haven't tested Windows ourselves.
+
+If the folder can't be written, ocrHub still returns every OCR result. It
+just doesn't save or cache them, and says so in the log (`docker compose logs
+ocrhub`), including a warning at startup.
 
 This is also the result cache: if the same file's hash already has a
 saved result for a given engine, `/ocr` returns it instead of re-running

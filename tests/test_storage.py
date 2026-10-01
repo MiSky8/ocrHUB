@@ -79,3 +79,24 @@ def test_raw_engine_response_survives_save_and_load(tmp_path):
     store.save("abc", "datalab", OcrResult(engine="datalab", text="x", raw={"children": []}))
 
     assert store.get("abc", "datalab").raw == {"children": []}
+
+
+def test_build_store_warns_when_data_folder_is_not_writable(tmp_path, monkeypatch, caplog):
+    import os
+
+    from ocrhub.storage import build_store
+
+    locked = tmp_path / "data"
+    locked.mkdir()
+    locked.chmod(0o555)
+    monkeypatch.setenv("OCRHUB_DATA_DIR", str(locked))
+    try:
+        if os.access(locked, os.W_OK):  # running as root: a read-only folder is still writable
+            return
+        with caplog.at_level("WARNING"):
+            build_store()
+    finally:
+        locked.chmod(0o755)
+
+    assert "not writable" in caplog.text
+    assert "chown" in caplog.text
