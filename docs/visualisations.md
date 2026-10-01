@@ -173,13 +173,19 @@ Code: `src/ocrhub/adapters/surya_adapter.py`.
   items, which show up in the text.
 - **Page confidence scale.** Region confidences are shown 0-100, but the page
   confidence in the saved JSON is the unscaled 0-1 mean over lines.
+- **List markers come out as LaTeX or odd glyphs.** Bullets, checkboxes and
+  warning icons are recognised as `\bullet`, `\prec`, `\blacktriangledown`
+  or sometimes a stray character (`۰` once), kept in front of the item's text
+  on the same line. Code regions can end in `\}` and table cells can carry
+  `{\tt ...}` markup. These are Surya's raw output and are not cleaned up.
 - **Reading order is per region, not per line.** Order badges number the
   blocks, not the lines inside them.
 - **Cost of layout and tables.** On a Docker Desktop Mac, the 2-page
   `ocrdoc.pdf` took about 195 s and the receipt photo about 195 s with layout
   on, and the container peaked at about 6.1 GiB (it was about 5.6 GiB with
   lines only), with no OOM kill. The first run also downloads the layout and
-  table models.
+  table models. The 4-page `OCR Test Document.pdf` took about 520 s (8.7
+  min).
 - **Receipts are one or a few big regions.** The layout model grouped the
   receipt photo's 29 lines into 3 regions (header, items, footer), so the
   block view is much coarser than Tesseract's lines there. All text is kept.

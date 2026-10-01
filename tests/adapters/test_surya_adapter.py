@@ -269,3 +269,18 @@ def test_table_text_keeps_cell_order_when_line_heights_differ():
     [box] = build_region_boxes(lines, regions, tables={0: cells})
 
     assert box.text == "North | $12,450"
+
+
+def test_list_marker_stays_on_the_same_line_as_its_text():
+    # the marker is detected as its own line, a little lower than the text
+    lines = [
+        _line("Regions", [60, 100, 200, 130]),
+        _line("\\bullet", [20, 108, 50, 138]),
+        _line("North", [60, 150, 200, 180]),
+        _line("\\bullet", [20, 158, 50, 188]),
+    ]
+    regions = [{"label": "Text", "position": 0, "bbox": [0, 90, 220, 200]}]
+
+    [box] = build_region_boxes(lines, regions)
+
+    assert box.text == "\\bullet Regions\n\\bullet North"

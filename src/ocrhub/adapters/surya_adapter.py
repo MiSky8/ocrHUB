@@ -78,10 +78,36 @@ def _area(bbox) -> float:
     return max(bbox[2] - bbox[0], 0) * max(bbox[3] - bbox[1], 0)
 
 
+def _rows(lines: list[dict]) -> list[list[dict]]:
+    """Group lines into visual rows, top to bottom, each left to right.
+
+    A line joins a row when its vertical centre falls inside that row's extent.
+    Sorting by top edge alone puts a list marker, which sits a little lower
+    than its text, on a row of its own after the text.
+    """
+    rows: list[list] = []  # [top, bottom, lines]
+    for ln in sorted(lines, key=lambda ln: _centre(ln["bbox"])[1]):
+        cy = _centre(ln["bbox"])[1]
+        for row in rows:
+            if row[0] <= cy <= row[1]:
+                row[0], row[1] = min(row[0], ln["bbox"][1]), max(row[1], ln["bbox"][3])
+                row[2].append(ln)
+                break
+        else:
+            rows.append([ln["bbox"][1], ln["bbox"][3], [ln]])
+    rows.sort(key=lambda row: row[0])
+    return [sorted(row[2], key=lambda ln: ln["bbox"][0]) for row in rows]
+
+
+def _row_texts(lines: list[dict]) -> list[str]:
+    """One string per visual row, its lines joined with spaces."""
+    return [" ".join(ln["text"] for ln in row) for row in _rows(lines)]
+
+
 def _lines_in(lines: list[dict], bbox) -> list[dict]:
-    """Lines whose centre is inside bbox, top to bottom then left to right."""
+    """Lines whose centre is inside bbox, in reading order."""
     inside = [ln for ln in lines if _contains(bbox, _centre(ln["bbox"]))]
-    return sorted(inside, key=lambda ln: (ln["bbox"][1], ln["bbox"][0]))
+    return [ln for row in _rows(inside) for ln in row]
 
 
 def _table_text(cells: list[dict], lines: list[dict]) -> str:
@@ -91,7 +117,7 @@ def _table_text(cells: list[dict], lines: list[dict]) -> str:
         rows.setdefault(cell["row"], []).append(cell)
     return "\n".join(
         " | ".join(
-            " ".join(ln["text"] for ln in _lines_in(lines, c["bbox"]))
+            " ".join(_row_texts(_lines_in(lines, c["bbox"])))
             for c in sorted(rows[r], key=lambda c: c["col"])
         )
         for r in sorted(rows)
@@ -107,7 +133,7 @@ def _table_html(cells: list[dict], lines: list[dict]) -> str:
     for row_id in sorted(rows):
         tds = []
         for cell in sorted(rows[row_id], key=lambda c: c["col"]):
-            text = "<br>".join(html.escape(ln["text"]) for ln in _lines_in(lines, cell["bbox"]))
+            text = "<br>".join(html.escape(t) for t in _row_texts(_lines_in(lines, cell["bbox"])))
             tag = "th" if cell["header"] else "td"
             attrs = "".join(
                 f' {name}="{value}"'
@@ -153,13 +179,13 @@ def build_region_boxes(
     for i in usable:
         region = regions[i]
         label = region["label"]
-        inside = sorted(owned[i], key=lambda ln: (ln["bbox"][1], ln["bbox"][0]))
+        inside = owned[i]
         if not inside and label not in _PICTURE_LABELS and i not in tables:
             continue
         confs = [ln["confidence"] for ln in inside if ln["confidence"] is not None]
         x0, y0, x1, y1 = (float(v) for v in region["bbox"])
         box = BoxResult(
-            text="\n".join(ln["text"] for ln in inside),
+            text="\n".join(_row_texts(inside)),
             x0=x0, y0=y0, x1=x1, y1=y1,
             confidence=sum(confs) / len(confs) * 100 if confs else None,
             reading_order=int(region["position"]),
