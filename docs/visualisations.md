@@ -283,13 +283,19 @@ Files used to try the dashboard (kept in `data/input`):
 |---|---|
 | Born-digital PDF | pdfplumber at its best: exact text, fonts, colours, tables, columns, pictures; a reference for the OCR engines |
 | Receipt photo (iPhone JPEG) | Image normalisation (rotation, MPO); a hard case for Tesseract and Surya (Surya returns 3 regions for it); Datalab's output on it was a mess and has not been reviewed |
-| German newspaper PDF | Dense multi-column layout; column splitting in pdfplumber; Surya is slow here (12 min) |
+| German newspaper PDF | Dense multi-column layout; column splitting in pdfplumber; Surya took about 14.5 min of compute here with layout on (more by the clock if the machine sleeps) |
 
-<!-- screenshot: the three demo files, one engine each -->
+![A dense German newspaper page in Surya and Datalab, with numbered boxes showing each engine's reading order](images/newspaper-chunk-order.jpg)
 
-A richer test document (footnotes, nested lists, two columns, a second
-page) made from markdown is still wanted, to exercise Datalab's structure
-and pdfplumber's column splitting.
+*A dense newspaper page, shown at low resolution only to illustrate layout
+(all rights remain with the publisher). With **Boxes** and **Order numbers** on,
+Surya (65 boxes, 97% confidence) cuts the page into many small text regions,
+while Datalab (28 boxes) uses fewer, larger blocks. Each engine numbers its
+own regions in its own reading order, so the same article is split and ordered
+differently.*
+
+A 4-page test document with nested lists, a task list, callouts, code samples
+and tables is also used, and shows how each engine handles list structure.
 
 ## Versions
 
