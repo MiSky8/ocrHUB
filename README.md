@@ -5,6 +5,20 @@ the same "which OCR engine works best for this document" comparison
 by hand across two separate OCR pipeline projects — this bundles that
 comparison into something you can run in one command.
 
+## Included engines
+
+| Engine | Version in this image | What it gives you | Runs |
+|---|---|---|---|
+| Tesseract | 5.5.0 (pytesseract 0.3.13) | text, per-word confidence, line boxes | local, always included |
+| pdfplumber | 0.11.9 | the text layer of born-digital PDFs: fonts, colours, tables | local, always included |
+| Surya | 0.14.7 (models: detection 2025-05-07, recognition 2025-05-16, layout and tables 2025-02-18) | line OCR, layout regions, reading order, tables | local, add with `ENGINES=surya` |
+| Datalab | hosted API (`datalab-python-sdk` 0.5.0, mode `accurate`) | layout blocks, html tables, pictures | cloud, add with `ENGINES=datalab` and a `DATALAB_API_KEY` (paid, free monthly tier: [datalab.to](https://www.datalab.to)) |
+
+These are the versions in the current image. Surya is pinned to 0.14.7; the
+others follow what the image build installs. [docs/visualisations.md](docs/visualisations.md)
+explains what each engine returns, how the dashboard draws it, and why newer
+Surya releases aren't used yet.
+
 ## Quickstart
 
 **Fastest way** - from this folder, with Docker running:
@@ -112,25 +126,12 @@ Any other MCP client that supports streamable HTTP can use the same URL,
 - The MCP tool returns **text only**: no boxes, no reading order, no page
   images. For those, use the HTTP API (`POST /ocr`) or the dashboard.
 - The file travels as base64 inside the tool call, which suits small files.
-  For large files or whole folders, let your script call `POST /ocr` with a
-  file upload instead (see Batch processing).
+  For large files, call `POST /ocr` with a file upload instead.
 
 **HTTP API (any LLM tool that can run `curl` or make requests).**
 `GET /engines` lists what is available and `POST /ocr` takes a `file` and one
 or more `engines` form fields. Results are cached by file content, so asking
 again for the same file and engine is instant.
-
-## Engines
-
-| Engine | Type | Install | Notes |
-|---|---|---|---|
-| Tesseract | local, CPU | default-on | classic baseline OCR |
-| pdfplumber | local, CPU | default-on | text extraction for born-digital PDFs, not OCR |
-| Surya | local, CPU (in-container) | `ENGINES=surya` | modern layout-aware OCR: regions, reading order, tables |
-| Datalab | hosted API | `ENGINES=datalab` + set `DATALAB_API_KEY` | paid, has a free monthly tier - see [datalab.to](https://www.datalab.to) |
-
-See [docs/visualisations.md](docs/visualisations.md) for how the dashboard
-draws each engine's output and what each one does and doesn't return.
 
 ## Build args
 
@@ -213,24 +214,6 @@ call) where you don't want to re-pay the cost on a file you already
 processed. Pass `refresh=true` as a form field on `/ocr` (or the MCP
 tool's `refresh` argument) to force recomputation. A failed result is
 never cached, so a transient error doesn't permanently poison it.
-
-## Batch processing
-
-There's no separate batch API - `/ocr` (and the MCP `ocr_document` tool)
-already take one file per call, and that's enough to process a whole
-folder: loop over it yourself. Every result still lands in the persistent
-store above, so re-running the same loop after a partial failure only
-recomputes what's missing.
-
-```bash
-for f in ~/my-dataset/*; do
-  curl -s -F "file=@$f" -F "engines=tesseract" -F "engines=surya" \
-    http://localhost:8000/ocr | jq -c '.results[] | {engine, ok, elapsed_ms}'
-done
-```
-
-An agent with shell access can run the same loop for you. See
-[Use from an LLM](#use-from-an-llm).
 
 ## Memory, speed and input limits
 
