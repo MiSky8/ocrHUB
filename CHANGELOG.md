@@ -19,6 +19,9 @@ First release. Version 0.1.0 matches `pyproject.toml`.
 - Results saved to `./data` and reused as a cache, keyed by file content
   (`refresh=true` forces a new run). If the folder can't be written, results are
   still returned.
+- A slim image (Tesseract and pdfplumber) on GitHub's container registry,
+  `ghcr.io/misky8/ocrhub`, for linux/amd64 and linux/arm64. Only the arm64
+  image has been run so far.
 - Documentation: a README, a visualisation guide (`docs/visualisations.md`) and
   `CONTRIBUTING.md`.
 

@@ -36,7 +36,19 @@ Surya releases aren't used yet.
 
 ## Quickstart
 
-From this folder, with Docker running:
+**Try it without building anything.** The published image has Tesseract and
+pdfplumber (about 640 MB, for Intel/AMD and Apple Silicon):
+
+```bash
+mkdir -p data
+docker run -p 8000:8000 -v "$PWD/data:/home/ocrhub/data" ghcr.io/misky8/ocrhub:latest
+```
+
+Open <http://localhost:8000>. Surya and Datalab aren't in that image (Surya
+alone adds several GB), so to use them build from source as below. Version tags
+such as `ghcr.io/misky8/ocrhub:0.1.0` are available too.
+
+**Build it yourself,** from this folder, with Docker running:
 
 ```bash
 mkdir -p data              # your results are saved here
