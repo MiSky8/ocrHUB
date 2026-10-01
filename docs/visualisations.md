@@ -49,13 +49,13 @@ pdfplumber appears immediately while Surya is still running.
 |---|---|---|---|---|
 | Input | PDF only (text layer) | image or PDF | image or PDF | image or PDF |
 | Is it OCR? | no, reads the PDF's text layer | yes | yes | yes (hosted API) |
-| Box granularity | text line (split at column gaps) | line, with words nested | line | layout block (paragraph, list, table, heading...) |
-| Reading order | yes, but geometric (top to bottom, left to right) | yes, from Tesseract's block/paragraph/line numbers | **no** | yes, from the engine |
-| Confidence | no | per word, per line, per page | per line, per page | no |
-| Region types | Text, Table, Picture | none | none | Title, Text, Table, Figure/Picture, Caption, Header, Footer |
+| Box granularity | text line (split at column gaps) | line, with words nested | layout region (lines with `SURYA_LAYOUT=0`) | layout block (paragraph, list, table, heading...) |
+| Reading order | yes, but geometric (top to bottom, left to right) | yes, from Tesseract's block/paragraph/line numbers | yes, from its layout model | yes, from the engine |
+| Confidence | no | per word, per line, per page | per region (mean of its lines), per page | no |
+| Region types | Text, Table, Picture | none | Title, Text, Table, Picture, Header, Footer, Caption, Equation, Code... | Title, Text, Table, Figure/Picture, Caption, Header, Footer |
 | Fonts and colours | yes: font, size, bold, italic, colour, per run | no | no | no (sizes are estimated, see below) |
-| Tables | real tables with cell alignment | no | no | yes, as html |
-| Pictures | cropped image | no | no | cropped image plus alt text |
+| Tables | real tables with cell alignment | no | yes, as html (table model) | yes, as html |
+| Pictures | cropped image | no | cropped image | cropped image plus alt text |
 | Original markup kept | no | no | no | yes: `html` per box and the untouched `raw` response |
 | Page image in result | no | yes | yes | no |
 | Coordinates | PDF points (about 595 wide for A4) | pixels | pixels | pixels (about 1600 wide in our tests) |
@@ -134,32 +134,54 @@ The classic baseline. Code: `src/ocrhub/adapters/tesseract_adapter.py`.
 
 ## Surya
 
-A modern OCR model with line detection and recognition.
+Surya is a set of models. The adapter runs four of them in sequence:
+detection and recognition (text lines and their text), then layout (labelled
+regions and a reading order) and table recognition (rows, columns and cells).
 Code: `src/ocrhub/adapters/surya_adapter.py`.
 
-<!-- screenshot: surya on the receipt photo -->
+<!-- screenshot: surya on the ocrdoc PDF: titles, text blocks, table, order badges -->
 
 **What the dashboard shows**
 
-- **One box per recognised line**, with a confidence (scaled to 0-100) and
-  the page image.
-- Surya's output can contain inline markup; it is stripped to plain text,
-  keeping table cells as ` | ` and list items on separate lines.
+- **One box per layout region**, in the layout model's reading order, with a
+  region type (Title, Text, Table, Picture, Header, Footer, Caption, ...)
+  and a confidence (the mean of the lines inside the region, 0-100). Each
+  line of recognised text is placed in the smallest region around its centre.
+  Labels Surya has but Datalab does not (Equation, Code, Form,
+  TableOfContents, Handwriting) keep Surya's own name.
+- **Tables as html.** The table model finds each Table region's cells,
+  including header cells and row and column spans. The adapter fills the
+  cells with the recognised lines that fall inside them.
+- **Pictures.** Picture and Figure regions are cropped from the page and
+  drawn like Datalab's.
+- **Lines outside every region** are kept as plain boxes with no region type
+  or reading order, so no recognised text is lost.
+- Recognised text can contain inline markup; it is stripped to plain text.
+- **Staged models.** The models run one after another and each is released
+  before the next loads, to keep memory down. The layout and table models
+  download on first use (the first run is slower).
+- **`SURYA_LAYOUT=0`** skips the layout and table models and returns one
+  box per line with no order or region types, which needs less time and memory.
+  If the layout step fails (for example a model download), the adapter logs a
+  warning and returns the lines instead of losing the OCR work.
 
 **Quirks**
 
-- **No reading order.** There are no order badges for Surya, and its
-  detections tab is in the order the model returned the lines.
-- **Layout and table models are not used.** Only detection and recognition
-  run, so there are no region types and no tables.
-- **Maths output.** Surya sometimes outputs LaTeX, such as `\triangle`, in
-  place of the characters it sees.
-- **Page confidence scale.** Line confidences are shown 0-100, but the page
-  confidence in the saved JSON is the unscaled 0-1 mean.
-- **Slow and memory-hungry.** About 1.5 minutes for a simple page and 12
-  minutes for a dense newspaper page, with 5+ GB of memory. A big photo was
-  once OOM-killed; batch sizes are now capped (recognition 8, detector 1,
-  peak about 5.6 GB). See the README's memory section.
+- **Maths output.** Surya sometimes outputs LaTeX in place of the characters
+  it sees: `\triangle` for a warning icon, and `\bullet` at the start of list
+  items, which show up in the text.
+- **Page confidence scale.** Region confidences are shown 0-100, but the page
+  confidence in the saved JSON is the unscaled 0-1 mean over lines.
+- **Reading order is per region, not per line.** Order badges number the
+  blocks, not the lines inside them.
+- **Cost of layout and tables.** On a Docker Desktop Mac, the 2-page
+  `ocrdoc.pdf` took about 195 s and the receipt photo about 195 s with layout
+  on, and the container peaked at about 6.1 GiB (it was about 5.6 GiB with
+  lines only), with no OOM kill. The first run also downloads the layout and
+  table models.
+- **Receipts are one or a few big regions.** The layout model grouped the
+  receipt photo's 29 lines into 3 regions (header, items, footer), so the
+  block view is much coarser than Tesseract's lines there. All text is kept.
 
 ## Datalab
 
@@ -209,7 +231,7 @@ Code: `src/ocrhub/adapters/datalab_adapter.py`.
 - **Order badges** are sized from the page's coordinate space
   (`max(15, 3% of page width)`), so they stay legible on a 595-point PDF and
   a 1600-pixel image alike. They are shown only for boxes that have a
-  reading order, which is why Surya has none.
+  reading order, which is why Surya has none when `SURYA_LAYOUT=0`.
 - **Draw priority inside a box** (`drawBoxes` in `web/static/app.js`):
   Picture image, else rendered html (Datalab), else styled runs
   (pdfplumber), else plain text fitted to the box (Tesseract, Surya).
@@ -234,7 +256,7 @@ Files used to try the dashboard (kept in `data/input`):
 | File | What it shows |
 |---|---|
 | Born-digital PDF | pdfplumber at its best: exact text, fonts, colours, tables, columns, pictures; a reference for the OCR engines |
-| Receipt photo (iPhone JPEG) | Image normalisation (rotation, MPO); a hard case for Tesseract and Surya; Datalab's output on it was a mess and has not been reviewed |
+| Receipt photo (iPhone JPEG) | Image normalisation (rotation, MPO); a hard case for Tesseract and Surya (Surya returns 3 regions for it); Datalab's output on it was a mess and has not been reviewed |
 | German newspaper PDF | Dense multi-column layout; column splitting in pdfplumber; Surya is slow here (12 min) |
 
 <!-- screenshot: the three demo files, one engine each -->
@@ -248,11 +270,10 @@ and pdfplumber's column splitting.
 - **Not tested:** the Overlay view, PaddleOCR and the Ollama (DeepSeek)
   engine. They are registered and listed, but their visualisation has not
   been checked, so nothing above should be assumed for them. (From earlier
-  testing, PaddleOCR does not report a reading order, like Surya.)
+  testing, PaddleOCR does not report a reading order.)
 - **HEIC** uploads are unsupported.
 - **No refresh button** in the UI to bypass the cache.
-- **Surya:** emits LaTeX such as `\triangle`; layout and table models are
-  unused.
+- **Surya:** emits LaTeX such as `\triangle` and `\bullet`.
 - **Datalab on the receipt photo** needs a look.
-- Only Datalab, pdfplumber and Tesseract report reading order, so order
-  badges and the detections sort are only meaningful for them.
+- Reading order comes from Datalab, pdfplumber, Tesseract and Surya (with
+  layout on). PaddleOCR does not report one.

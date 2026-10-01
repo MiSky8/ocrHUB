@@ -21,6 +21,12 @@ services:
       # but safe on Docker Desktop's default ~8 GB. Raise both if you have RAM.
       - RECOGNITION_BATCH_SIZE=${SURYA_RECOGNITION_BATCH_SIZE:-8}
       - DETECTOR_BATCH_SIZE=${SURYA_DETECTOR_BATCH_SIZE:-1}
+      # Layout and table models run after recognition (reading order, regions,
+      # tables). SURYA_LAYOUT=0 skips them and returns plain lines, which needs
+      # less memory and time.
+      - SURYA_LAYOUT=${SURYA_LAYOUT:-1}
+      - LAYOUT_BATCH_SIZE=${SURYA_LAYOUT_BATCH_SIZE:-2}
+      - TABLE_REC_BATCH_SIZE=${SURYA_TABLE_REC_BATCH_SIZE:-2}
     volumes:
       # Persists downloaded Surya/PaddleOCR model weights across restarts.
       - ocrhub-models:/home/ocrhub/.cache

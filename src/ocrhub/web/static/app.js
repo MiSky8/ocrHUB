@@ -670,7 +670,14 @@ function pageBaseFont(boxes) {
     .filter((b) => b.region_type === "Text" && b.html && !/<(table|ul|ol)\b/i.test(b.html))
     .map((b) => estimateHtmlFont(b).size)
     .sort((a, b) => a - b);
-  return sizes.length ? sizes[Math.floor(sizes.length / 2)] : 12;
+  if (sizes.length) return sizes[Math.floor(sizes.length / 2)];
+  // No html text blocks (Surya returns plain text next to its html tables):
+  // use the size the plain text blocks fit at.
+  const plain = boxes
+    .filter((b) => b.region_type === "Text" && !b.html && b.text)
+    .map((b) => fitFont(b))
+    .sort((a, b) => a - b);
+  return plain.length ? plain[Math.floor(plain.length / 2)] : 12;
 }
 
 // Font size and line-height for an html block. Engines that know the real size

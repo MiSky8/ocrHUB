@@ -92,7 +92,7 @@ redirects on POST should target `/mcp/` directly.
 |---|---|---|---|
 | Tesseract | local, CPU | default-on | classic baseline OCR |
 | pdfplumber | local, CPU | default-on | text extraction for born-digital PDFs, not OCR |
-| Surya | local, CPU (in-container) | `ENGINES=surya` | modern layout-aware OCR |
+| Surya | local, CPU (in-container) | `ENGINES=surya` | modern layout-aware OCR: regions, reading order, tables |
 | PaddleOCR | local, CPU (in-container) | `ENGINES=paddleocr` | strong multilingual support |
 | DeepSeek (via Ollama) | self-hosted vision model | set `OLLAMA_HOST` | point at your own Ollama instance, runs natively outside this container |
 | Datalab | hosted API | `ENGINES=datalab` + set `DATALAB_API_KEY` | paid, has a free monthly tier - see [datalab.to](https://www.datalab.to) |
@@ -145,7 +145,7 @@ Each `<engine>.json` holds the extracted text, and per page the boxes
   `Table` boxes with `html`.
 - **Pictures (Datalab, pdfplumber):** `region_type: "Picture"` boxes with the
   cropped image as base64 JPEG in `image`; Datalab also gives its alt
-  text/caption in `text`. Tesseract and Surya don't detect pictures.
+  text/caption in `text`. Surya's picture regions are cropped too; Tesseract doesn't detect pictures.
 - **Tesseract:** one box per line, with the individual words (and their
   confidences) nested in `words`; page confidence is the mean word confidence.
 
@@ -190,7 +190,7 @@ tests on a Docker Desktop Mac (8 GB limit), so treat them as rough:
 | pdfplumber | under a second (born-digital PDFs only) | tiny |
 | Tesseract | 2-20 s per page (longer for dense pages) | small |
 | Datalab | 10 s - 2.5 min in our tests (hosted, so it depends on their queue) | none locally |
-| Surya | ~1.5 min for a simple page or a receipt photo, **12 min for a dense newspaper page** | **5+ GB** |
+| Surya | ~3 min for a 2-page PDF or a receipt photo with layout and tables on (**12 min** for a dense newspaper page, measured with lines only) | **about 6 GB** |
 | PaddleOCR | not measured here | not measured here |
 
 **If Surya (or the whole container) just disappears with no error**, it was
@@ -210,6 +210,10 @@ the defaults are already conservative):
 SURYA_RECOGNITION_BATCH_SIZE=8
 SURYA_DETECTOR_BATCH_SIZE=1
 ```
+
+Surya also runs its layout and table models after recognition. They give it
+regions, a reading order and tables, and download on first use. They cost
+some time and memory; set `SURYA_LAYOUT=0` in `.env` to skip them.
 
 Watch what the container is doing with `docker compose logs -f ocrhub`.
 
