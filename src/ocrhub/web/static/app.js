@@ -22,6 +22,32 @@ state.layoutMode = "side-by-side";
 state.detectionsTab = null;
 state.running = new Set();
 let runTimer = null;
+state.page = 0;        // page shown, 0-based; every engine's result holds all pages
+
+// The result's page at the selected index; null when the engine returned fewer pages.
+function pageOf(result) {
+  return result.pages[state.page] || null;
+}
+
+function pageCount() {
+  return Math.max(0, ...Object.values(state.results).filter((r) => r.ok).map((r) => r.pages.length));
+}
+
+function setPage(n) {
+  state.page = Math.min(Math.max(n, 0), Math.max(pageCount() - 1, 0));
+  renderResultsGrid();
+}
+
+function renderPageNav() {
+  const nav = document.getElementById("page-nav");
+  const total = pageCount();
+  nav.hidden = total < 2;
+  if (total < 2) return;
+  state.page = Math.min(state.page, total - 1);
+  document.getElementById("page-label").textContent = `${state.page + 1} / ${total}`;
+  document.getElementById("page-prev").disabled = state.page === 0;
+  document.getElementById("page-next").disabled = state.page >= total - 1;
+}
 
 function isPdfFile() {
   return !!state.file && (state.file.type === "application/pdf" || /\.pdf$/i.test(state.file.name));
@@ -123,7 +149,7 @@ function renderResultsList() {
       addRow(name, true, r.error || "Failed", false, null, true);
       return;
     }
-    const boxes = r.pages.length ? r.pages[0].boxes.length : 0;
+    const boxes = pageOf(r) ? pageOf(r).boxes.length : 0;
     const meta = isTextOnly(r) ? `text only · ${r.elapsed_ms} ms` : `${boxes} boxes · ${r.elapsed_ms} ms`;
     addRow(name, true, meta, state.visible.has(name), () => toggleVisible(name), false);
   });
@@ -241,7 +267,8 @@ function originalSrc() {
   // PDFs: borrow the first page image any finished engine rendered.
   for (const n of state.engines) {
     const r = state.results[n];
-    if (r && r.ok && r.pages.length && r.pages[0].image_base64) return `data:image/png;base64,${r.pages[0].image_base64}`;
+    const pg = r && r.ok ? pageOf(r) : null;
+    if (pg && pg.image_base64) return `data:image/png;base64,${pg.image_base64}`;
   }
   return null;
 }
@@ -283,6 +310,7 @@ function renderResultsGrid() {
   const grid = document.getElementById("results-grid");
   grid.innerHTML = "";
   renderResultsList();
+  renderPageNav();
 
   const shown = state.engines.filter((n) => state.visible.has(n) && state.results[n] && !state.running.has(n));
   const running = state.engines.filter((n) => state.running.has(n));
@@ -350,12 +378,19 @@ function renderDetections() {
     rowsEl.appendChild(note);
     return;
   }
-  const page = pages[0];
+  const page = pageOf(state.results[state.detectionsTab]);
+  if (!page) {
+    const note = document.createElement("div");
+    note.className = "panel-note";
+    note.textContent = `No page ${state.page + 1} in this result.`;
+    rowsEl.appendChild(note);
+    return;
+  }
   let rows;
   if (isTextOnly(state.results[state.detectionsTab])) {
     // No boxes: list the scraped text lines in the order they were read.
     rows = [];
-    pages.forEach((p) => {
+    [page].forEach((p) => {
       p.text.split("\n").filter((t) => t.trim()).forEach((t) => {
         rows.push({ text: t, reading_order: rows.length + 1, confidence: null });
       });
@@ -433,9 +468,9 @@ function renderOverlayPanel(names) {
   panel.appendChild(header);
 
   // Canonical image: first engine (in `names` order) whose first page has an image.
-  const canonicalName = names.find((n) => state.results[n].pages.length && state.results[n].pages[0].image_base64);
+  const canonicalName = names.find((n) => pageOf(state.results[n]) && pageOf(state.results[n]).image_base64);
   if (!canonicalName) return panel;
-  const canonicalPage = state.results[canonicalName].pages[0];
+  const canonicalPage = pageOf(state.results[canonicalName]);
 
   const wrap = document.createElement("div");
   wrap.className = "page-image-wrap";
@@ -449,8 +484,8 @@ function renderOverlayPanel(names) {
     const canonicalW = img.naturalWidth, canonicalH = img.naturalHeight;
 
     names.forEach((name) => {
-      if (!state.results[name].pages.length) return;
-      const page = state.results[name].pages[0];
+      const page = pageOf(state.results[name]);
+      if (!page) return;
       let scaleX = 1, scaleY = 1;
       if (page.image_base64 && name !== canonicalName) {
         // Measure this engine's own image dimensions before scaling its boxes.
@@ -532,7 +567,15 @@ function renderPanel(name, result) {
     panel.appendChild(note);
     return panel;
   }
-  const page = result.pages[0];
+  const page = pageOf(result);
+  if (!page) {
+    panel.appendChild(header);
+    const note = document.createElement("div");
+    note.className = "panel-note";
+    note.textContent = `No page ${state.page + 1} in this result.`;
+    panel.appendChild(note);
+    return panel;
+  }
   if (isTextOnly(result)) {
     const stats = document.createElement("div");
     stats.className = "panel-stats mono";
@@ -845,6 +888,7 @@ function handleFileChosen(file) {
   chip.hidden = false;
   nameEl.textContent = file.name;
   state.results = {};
+  state.page = 0;
   state.visible.clear();
   state.showOriginal = true;
   state.detectionsTab = null;
@@ -861,6 +905,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("mode-overlay").addEventListener("click", () => setLayoutMode("overlay"));
   document.getElementById("toggle-boxes").addEventListener("click", () => toggleShow("boxes"));
   document.getElementById("toggle-text").addEventListener("click", () => toggleShow("text"));
+  document.getElementById("page-prev").addEventListener("click", () => setPage(state.page - 1));
+  document.getElementById("page-next").addEventListener("click", () => setPage(state.page + 1));
   document.getElementById("toggle-order").addEventListener("click", () => toggleShow("orderNumbers"));
 
   loadEngines();

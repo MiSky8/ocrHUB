@@ -576,3 +576,23 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .ocr-html td[align=center], .ocr-html th[align=center] { text-align: center; }
 .ocr-html td, .ocr-html th { border: 1px solid #c8c8c8; padding: 0.15em 0.4em; text-align: left; }
 .ocr-html th { font-weight: 600; }
+
+.page-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-nav[hidden] {
+  display: none;
+}
+
+.page-nav .show-toggle {
+  padding: 4px 12px;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.page-nav .show-toggle:disabled {
+  opacity: 0.4;
+}
