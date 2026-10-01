@@ -4,13 +4,11 @@ services:
       context: .
       args:
         # Comma-separated optional engines to install at build time (surya,
-        # paddleocr, datalab). tesseract/pdfplumber are always installed.
+        # datalab). tesseract/pdfplumber are always installed.
         ENGINES: ${ENGINES:-}
     ports:
       - "8000:8000"
     environment:
-      # Reachable Ollama instance for the DeepSeek vision engine.
-      - OLLAMA_HOST=${OLLAMA_HOST:-}
       # Datalab hosted OCR API (https://www.datalab.to) - leave blank to disable.
       - DATALAB_API_KEY=${DATALAB_API_KEY:-}
       - DATALAB_BASE_URL=${DATALAB_BASE_URL:-}
@@ -28,7 +26,7 @@ services:
       - LAYOUT_BATCH_SIZE=${SURYA_LAYOUT_BATCH_SIZE:-2}
       - TABLE_REC_BATCH_SIZE=${SURYA_TABLE_REC_BATCH_SIZE:-2}
     volumes:
-      # Persists downloaded Surya/PaddleOCR model weights across restarts.
+      # Persists downloaded Surya model weights across restarts.
       - ocrhub-models:/home/ocrhub/.cache
       # Uploaded files and every engine's OCR output as JSON, keyed by content
       # hash, in a plain folder you can open: ./data/input and ./data/output

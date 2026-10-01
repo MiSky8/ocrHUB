@@ -34,23 +34,11 @@ dependencies = [
 # (Versions between 0.14.7 and the 0.20+ rewrite were not individually
 # checked - 0.14.7 is simply the one that was verified.)
 #
-# numpy<2 is also pinned here (and in the paddleocr extra below): when both
-# extras are installed together, paddleocr 2.7.3's own dependency pins
-# force in opencv-python==4.6.0.66 / opencv-contrib-python==4.6.0.66 (2022
-# wheels built against NumPy 1.x), which overwrite the newer
-# opencv-python-headless wheel surya-ocr pulls in in the shared `cv2`
-# import namespace. Without a numpy<2 pin, pip otherwise resolves
-# numpy>=2 (nothing else in the graph caps it), and the NumPy-1-built cv2
-# extension then fails to import under NumPy 2.x ("compiled using NumPy
-# 1.x cannot be run in NumPy 2.x").
+# numpy<2 is also pinned: it is part of the environment this adapter was
+# verified in. (It was first added to avoid an opencv/NumPy clash with
+# PaddleOCR, which has since been removed; the pin was kept so the verified
+# environment doesn't change. Dropping it is untested.)
 surya = ["surya-ocr==0.14.7", "numpy<2"]
-# Pinned: paddleocr 3.x removed the show_log/use_angle_cls constructor
-# kwargs this adapter uses and changed the .ocr()/.predict() call shape;
-# 2.7.3 + paddlepaddle 2.6.2 match the adapter's current
-# `.ocr(img, cls=True)` call and nested result parsing. See the numpy<2
-# note on the surya extra above - it applies here too (and is what
-# actually triggers the conflict, via this extra's own opencv pins).
-paddleocr = ["paddleocr==2.7.3", "paddlepaddle==2.6.2", "numpy<2"]
 # brotlicffi: Datalab's API responses are Brotli-encoded; the SDK's aiohttp
 # client needs this to decompress them (see agentVLM/pyproject.toml, which
 # vendors the same datalab_sdk usage this adapter is based on).

@@ -31,8 +31,8 @@ Screenshot spots are marked `<!-- screenshot: ... -->`.
 - **Side by side:** one panel per engine, plus the original. Each panel
   draws that engine's boxes on the page.
 - **Overlay:** all engines' boxes drawn on top of one page image, each in
-  its own colour (tesseract blue, surya orange, paddleocr purple, datalab
-  green, pdfplumber grey). The image used is the first engine's page image;
+  its own colour (tesseract blue, surya orange, datalab green, pdfplumber
+  grey). The image used is the first engine's page image;
   boxes from engines that measured a different image size are rescaled to it.
 - **Show toggles:** *Boxes* (outlines), *Text* (the recognised text drawn at
   the box position) and *Order numbers* (reading-order badges).
@@ -280,9 +280,7 @@ dates are from PyPI, checked on 2026-10-01.
 | Component | Used | Latest | Why this version |
 |---|---|---|---|
 | surya-ocr | 0.14.7 (2025-07-25), pinned | 0.22.1 (2026-07-20) | The 0.20+ line (0.20.0 is 2026-05-27) rewrote recognition around a VLM backend that needs an external llama-server or a GPU, with a different call signature and no per-line confidence. 0.14.7 is the version verified against this adapter. 0.15.0 to 0.17.1 (2025-08 to 2026-01) were not individually tested. |
-| paddleocr | 2.7.3 (2024-03-29), pinned | 3.7.0 (2026-06-11) | 3.x removed constructor arguments the adapter uses and changed the result format; in testing on Apple Silicon it segfaulted. |
-| paddlepaddle | 2.6.2 (2024-09-13), pinned | 3.3.1 (2026-03-26) | Goes with paddleocr 2.7.3. |
-| numpy | below 2, pinned | | paddleocr's old opencv wheels break under numpy 2. |
+| numpy | below 2, pinned | | Kept from the environment this was verified in. It was first needed for PaddleOCR, which has been removed. |
 | Python | 3.11 (`python:3.11-slim`) | | The project requires 3.11 or newer. Surya allows 3.10 or newer. Newer Pythons were not tested with the pinned engines. |
 | Tesseract | 5.5.0 | | Installed from Debian by `apt` in the Dockerfile, so the version follows the base image. |
 | pytesseract | 0.3.13 (2024-08-16) | 0.3.13 | Not pinned, and already the latest. |
@@ -293,18 +291,23 @@ dates are from PyPI, checked on 2026-10-01.
 version bump. The recognition call changes, per-line confidence goes away
 (so the confidence column and bars would be empty for Surya), and the layout
 and table code in `surya_adapter.py` was written against the 0.14.7 API and
-would need rechecking. A reasonable first experiment would be 0.17.1, the
-last release before that rewrite, but it has not been tried.
+would need rechecking. Within the 0.1x line, 0.15.0 to 0.17.1 keep the
+same recognition call and result shapes, but 0.15.0 and later build the
+recogniser on a new `FoundationPredictor`, which the adapter would have to
+create and pass in, and they download newer recognition models (and, from
+0.17.x, a newer layout model). 0.16 and later also need `transformers`
+4.56.1 or newer. A reasonable first experiment would be 0.17.1, but it has not
+been tried.
 
 ## Known limitations and untested parts
 
-- **Not tested:** the Overlay view, PaddleOCR and the Ollama (DeepSeek)
-  engine. They are registered and listed, but their visualisation has not
-  been checked, so nothing above should be assumed for them. (From earlier
-  testing, PaddleOCR does not report a reading order.)
+- **Not tested:** the Overlay view.
+- **Removed engines:** PaddleOCR and the Ollama (DeepSeek) engine were
+  removed before the first release because they had never been tested here.
+  They remain in the git history before the removal commit.
 - **HEIC** uploads are unsupported.
 - **No refresh button** in the UI to bypass the cache.
 - **Surya:** emits LaTeX such as `\triangle` and `\bullet`.
 - **Datalab on the receipt photo** needs a look.
-- Reading order comes from Datalab, pdfplumber, Tesseract and Surya (with
-  layout on). PaddleOCR does not report one.
+- Reading order comes from all four engines, though pdfplumber's is
+  geometric and Surya's needs the layout step (`SURYA_LAYOUT` on).

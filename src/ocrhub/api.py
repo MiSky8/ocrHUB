@@ -7,8 +7,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from ocrhub.adapters.datalab_adapter import DatalabAdapter
-from ocrhub.adapters.ollama_adapter import OllamaAdapter
-from ocrhub.adapters.paddleocr_adapter import PaddleOcrAdapter
 from ocrhub.adapters.pdfplumber_adapter import PdfplumberAdapter
 from ocrhub.adapters.surya_adapter import SuryaAdapter
 from ocrhub.adapters.tesseract_adapter import TesseractAdapter
@@ -25,8 +23,6 @@ def build_registry() -> EngineRegistry:
     registry.register(PdfplumberAdapter())
     registry.register(TesseractAdapter())
     registry.register(SuryaAdapter())
-    registry.register(PaddleOcrAdapter())
-    registry.register(OllamaAdapter())
     registry.register(DatalabAdapter())
     return registry
 

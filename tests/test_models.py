@@ -14,7 +14,7 @@ def test_ocr_result_ok_when_no_error():
 
 def test_ocr_result_not_ok_when_error_set():
     result = OcrResult(
-        engine="paddleocr",
+        engine="tesseract",
         text="",
         pages=[],
         confidence=None,

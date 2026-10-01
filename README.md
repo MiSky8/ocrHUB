@@ -46,7 +46,7 @@ image size.
 
 **One config file, one command:** copy `.env.example` to
 `.env`, edit it to pick which engines to build (`ENGINES=`) and set any
-runtime config (`OLLAMA_HOST`, `DATALAB_API_KEY`, ...), then:
+runtime config (`DATALAB_API_KEY`, ...), then:
 
 ```bash
 cp .env.example .env   # edit .env to taste
@@ -62,9 +62,8 @@ other (runtime-only) variables without rebuilding.
 Compose - `ENGINES` is a build arg, everything else is a runtime `-e`:
 
 ```bash
-docker build --build-arg ENGINES=surya,paddleocr,datalab -t ocrhub .
+docker build --build-arg ENGINES=surya,datalab -t ocrhub .
 docker run -p 8000:8000 \
-  -e OLLAMA_HOST=http://host.docker.internal:11434 \
   -e DATALAB_API_KEY=your-key-here \
   -v ocrhub-models:/home/ocrhub/.cache ocrhub
 ```
@@ -93,8 +92,6 @@ redirects on POST should target `/mcp/` directly.
 | Tesseract | local, CPU | default-on | classic baseline OCR |
 | pdfplumber | local, CPU | default-on | text extraction for born-digital PDFs, not OCR |
 | Surya | local, CPU (in-container) | `ENGINES=surya` | modern layout-aware OCR: regions, reading order, tables |
-| PaddleOCR | local, CPU (in-container) | `ENGINES=paddleocr` | strong multilingual support |
-| DeepSeek (via Ollama) | self-hosted vision model | set `OLLAMA_HOST` | point at your own Ollama instance, runs natively outside this container |
 | Datalab | hosted API | `ENGINES=datalab` + set `DATALAB_API_KEY` | paid, has a free monthly tier - see [datalab.to](https://www.datalab.to) |
 
 See [docs/visualisations.md](docs/visualisations.md) for how the dashboard
@@ -103,23 +100,23 @@ draws each engine's output and what each one does and doesn't return.
 ## Build args
 
 `ENGINES` is a comma-separated list of optional extras to install at
-build time (currently: `surya`, `paddleocr`, `datalab`). Tesseract and
+build time (currently: `surya`, `datalab`). Tesseract and
 pdfplumber are always installed. Leave `ENGINES` unset for the smallest
 image.
 
 ## Persistent model cache
 
-Surya and PaddleOCR download their model weights on first use (not
-baked into the image, to keep the base build small) — Surya's
-recognition model alone is ~1.6GB. Both cache under `/home/ocrhub/.cache`
-inside the container. Without a mounted volume, that cache is lost
+Surya downloads its model weights on first use (not baked into the
+image, to keep the base build small): the recognition model alone is
+~1.6GB, plus the detection, layout and table models. They cache under
+`/home/ocrhub/.cache` inside the container. Without a mounted volume, that cache is lost
 every time the container is removed or recreated, so you'll re-pay
 that download on every fresh `docker run`.
 
 Mount a named volume to persist it across runs, as shown in the
 Quickstart above (`-v ocrhub-models:/home/ocrhub/.cache`) — the second and
-subsequent runs then start these engines instantly instead of
-re-downloading their weights.
+subsequent runs then start Surya instantly instead of
+re-downloading its weights.
 
 ## Persistent input/output storage
 
@@ -155,7 +152,7 @@ on Docker Desktop for Mac this just works.
 
 This is also the result cache: if the same file's hash already has a
 saved result for a given engine, `/ocr` returns it instead of re-running
-that engine - useful for anything slow (Surya, PaddleOCR, a paid Datalab
+that engine - useful for anything slow (Surya, a paid Datalab
 call) where you don't want to re-pay the cost on a file you already
 processed. Pass `refresh=true` as a form field on `/ocr` (or the MCP
 tool's `refresh` argument) to force recomputation. A failed result is
@@ -191,7 +188,6 @@ tests on a Docker Desktop Mac (8 GB limit), so treat them as rough:
 | Tesseract | 2-20 s per page (longer for dense pages) | small |
 | Datalab | 10 s - 2.5 min in our tests (hosted, so it depends on their queue) | none locally |
 | Surya | ~3 min for a 2-page PDF or a receipt photo with layout and tables on (**12 min** for a dense newspaper page, measured with lines only) | **about 6 GB** |
-| PaddleOCR | not measured here | not measured here |
 
 **If Surya (or the whole container) just disappears with no error**, it was
 almost certainly killed for running out of memory: Docker Desktop's default
@@ -232,34 +228,21 @@ born-digital PDFs; photographed pages will be slower and less accurate.
 
 ## GPU acceleration
 
-Everything running **inside** this container — Tesseract, pdfplumber,
-Surya, PaddleOCR — is CPU-only. That's true regardless of your host
-hardware, including on machines with an NVIDIA GPU: the published
-image doesn't include CUDA-enabled builds of PyTorch/PaddlePaddle, so
-a GPU present on the host isn't used by the containerized engines.
+Everything running **inside** this container (Tesseract, pdfplumber, Surya)
+is CPU-only. That's true regardless of your host hardware, including on
+machines with an NVIDIA GPU: the image doesn't include CUDA-enabled builds
+of PyTorch, so a GPU present on the host isn't used by the containerised
+engines.
 
-On **macOS specifically**, no container can access the host GPU at
-all (Apple Silicon or Intel) — Docker Desktop on Mac runs containers
-inside a Linux VM with no Metal passthrough. This is a Docker-on-Mac
-platform limitation, not something this image can work around.
+On **macOS specifically**, no container can access the host GPU at all
+(Apple Silicon or Intel): Docker Desktop on Mac runs containers inside a
+Linux VM with no Metal passthrough. This is a Docker-on-Mac platform
+limitation, not something this image can work around.
 
-The one engine that *does* get GPU acceleration on your machine is
-**Ollama/DeepSeek** — because it isn't bundled in this container at
-all. You run Ollama natively on your host (where it can use Metal on
-Mac or CUDA on Linux/Windows), and ocrHub just calls it over HTTP via
-`OLLAMA_HOST`. If you want GPU speed today, that's the path.
-
-If you're on Linux with an NVIDIA GPU and want Surya/PaddleOCR
-accelerated too, you'd need to build a variant of this image against
-CUDA-enabled PyTorch/PaddlePaddle wheels and pass `--gpus all` at
-`docker run` — not something this image does out of the box (v1 is
-intentionally CPU-only/portable), but a reasonable fast-follow if
-there's interest.
-
-Separately: `paddleocr` is pinned to `2.7.3` (not the current `3.x`)
-because `3.x` broke its API and, in testing on Apple Silicon (arm64),
-segfaulted at inference time. `2.7.3` is the last version verified
-stable in this image.
+If you're on Linux with an NVIDIA GPU and want Surya accelerated, you'd need
+to build a variant of this image against CUDA-enabled PyTorch wheels and
+pass `--gpus all` at `docker run`. This image doesn't do that out of the box
+(it is intentionally CPU-only and portable).
 
 ## Running the tests
 

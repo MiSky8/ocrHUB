@@ -1,10 +1,8 @@
 const ENGINE_COLORS = {
   tesseract: "#1f5fa8",
   surya: "#b04a06",
-  paddleocr: "#6b3fa0",
   datalab: "#2f7d4f",
   pdfplumber: "#8a8a8a",
-  "ollama-deepseek": "#a7a195",
 };
 
 const PDF_ONLY = new Set(["pdfplumber"]);
