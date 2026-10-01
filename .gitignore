@@ -9,3 +9,6 @@ build/
 .env
 data/
 .DS_Store
+
+# Internal working notes (design specs and plans), kept locally only
+docs/superpowers/

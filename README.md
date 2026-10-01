@@ -85,6 +85,38 @@ standard behavior for a mounted sub-app. Any redirect-following HTTP
 client handles this transparently, but MCP clients that don't follow
 redirects on POST should target `/mcp/` directly.
 
+## Use from an LLM
+
+With ocrHub running (`docker compose up -d`), a language model can call it
+in two ways.
+
+**MCP (agents such as Claude Code).** Add the server once:
+
+```bash
+claude mcp add --transport http ocrhub http://localhost:8000/mcp/
+```
+
+Any other MCP client that supports streamable HTTP can use the same URL,
+`http://localhost:8000/mcp/`. The server has one tool:
+
+| Tool | Arguments | Returns |
+|---|---|---|
+| `ocr_document` | `file_base64`, `filename`, `engines` (a list), optional `refresh` | per engine: `text`, per-page text, `confidence`, `elapsed_ms`, `error` |
+
+- Use engine names from `GET /engines` (for example `tesseract`, `pdfplumber`,
+  `surya`, `datalab`). An engine that isn't installed returns
+  "engine not available" without stopping the others.
+- The MCP tool returns **text only**: no boxes, no reading order, no page
+  images. For those, use the HTTP API (`POST /ocr`) or the dashboard.
+- The file travels as base64 inside the tool call, which suits small files.
+  For large files or whole folders, let your script call `POST /ocr` with a
+  file upload instead (see Batch processing).
+
+**HTTP API (any LLM tool that can run `curl` or make requests).**
+`GET /engines` lists what is available and `POST /ocr` takes a `file` and one
+or more `engines` form fields. Results are cached by file content, so asking
+again for the same file and engine is instant.
+
 ## Engines
 
 | Engine | Type | Install | Notes |
@@ -173,9 +205,8 @@ for f in ~/my-dataset/*; do
 done
 ```
 
-Or, since `ocr_document` is exposed over MCP, an MCP-capable agent (e.g.
-Claude) can drive it directly - point it at a local folder and ask it to
-OCR every file with the engines you want, no script required.
+An agent with shell access can run the same loop for you. See
+[Use from an LLM](#use-from-an-llm).
 
 ## Memory, speed and input limits
 

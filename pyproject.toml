@@ -29,8 +29,7 @@ dependencies = [
 # (no det_predictor kwarg) and no per-line confidence scores at all. 0.14.7
 # is a release on the earlier torch detection+recognition architecture that
 # matches this adapter's det_predictor-based API and TextLine.confidence
-# usage; verified working end-to-end against a real Docker build (see
-# docs/superpowers/sdd/2026-09-28-ocrhub-implementation/final-review-fix-report.md).
+# usage; verified working end-to-end against a real Docker build.
 # (Versions between 0.14.7 and the 0.20+ rewrite were not individually
 # checked - 0.14.7 is simply the one that was verified.)
 #
