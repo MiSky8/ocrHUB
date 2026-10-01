@@ -1,11 +1,24 @@
 # ocrHub
 
-One Docker image, several OCR engines, one API. Built after running
-the same "which OCR engine works best for this document" comparison
-by hand across two separate OCR pipeline projects — this bundles that
-comparison into something you can run in one command.
+One Docker image, several OCR engines, one API.
+
+Over many projects I kept asking the same question: which OCR engine is right
+for this document, and what will it actually give me? What I learned each time
+was scattered. ocrHub gathers that experience in one place and shares it, so
+anyone exploring AI automations that involve OCR can see how several engines
+handle their own documents, side by side, and decide faster.
 
 ![The ocrHub dashboard: the original page next to pdfplumber, Tesseract, Surya and Datalab](docs/images/dashboard-compare-engines.png)
+
+**Who it's for.** Anyone choosing or testing OCR for an automation: upload a
+document, run several engines on it, and compare their text, boxes, reading
+order and tables. A script or an AI agent can call the same engines through the
+API or MCP. It runs on CPU in one container, so it's built for comparing, not
+for speed: Surya can take minutes per page, and there's no GPU inside the
+container.
+
+Want to know what each engine can and can't do? See the
+[visualisation guide](docs/visualisations.md).
 
 ## Included engines
 
