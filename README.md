@@ -266,6 +266,13 @@ some time and memory; set `SURYA_LAYOUT=0` in `.env` to skip them.
 
 Watch what the container is doing with `docker compose logs -f ocrhub`.
 
+**Long runs.** Surya on a dense page (a newspaper, say) takes 15 to 40
+minutes. Keep the computer awake while it runs (on a Mac, run `caffeinate -i`
+in a terminal): if it goes to sleep, the browser's connection drops and the page
+shows "Failed to fetch". The run itself carries on and the result is saved, so
+once `docker compose logs ocrhub` shows the layout step finished, choose the
+same file and Surya again and the saved result appears straight away.
+
 Every engine you tick is sent as its own request, so fast engines show their
 results while slow ones are still running, and results are cached on disk
 either way: if you close the tab during a long Surya run, re-uploading the
