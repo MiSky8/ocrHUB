@@ -1,5 +1,7 @@
 # ocrHub — Design Spec
 
+> **Historical note:** this document was written before the first release. PaddleOCR and the Ollama (DeepSeek) engine it describes were later removed, so ignore them. The rest is kept as written.
+
 Date: 2026-09-28
 
 ## Purpose

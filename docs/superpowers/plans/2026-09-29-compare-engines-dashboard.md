@@ -1,5 +1,7 @@
 # Compare Engines Dashboard Implementation Plan
 
+> **Historical note:** this document was written before the first release. PaddleOCR and the Ollama (DeepSeek) engine it describes were later removed, so ignore them. The rest is kept as written.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Extend the Surya and PaddleOCR adapters to emit word/line-level bounding boxes and a page image (matching what `TesseractAdapter` already does), then replace ocrHub's minimal web UI with a "Compare engines" dashboard that shows up to 3 engines' box-annotated output side by side or overlaid, with a sortable per-engine detections table.
@@ -8,7 +10,7 @@
 
 **Tech Stack:** Python 3.11, FastAPI, pytest, vanilla JS/CSS (no frontend framework), surya-ocr==0.14.7, paddleocr==2.7.3.
 
-**Spec:** `docs/superpowers/specs/2026-09-28-ocrhub-design.md` (original v1 spec — explicitly excludes EasyOCR and mandates "lightweight server-rendered/vanilla JS — no heavy frontend framework"). This plan has no separate design doc; the design was worked out in conversation and is fully specified in this plan's tasks, including exact mockup values pulled from `/Users/ali/Downloads/Compare engines-html/Main.dc.html`.
+**Spec:** `docs/superpowers/specs/2026-09-28-ocrhub-design.md` (original v1 spec — explicitly excludes EasyOCR and mandates "lightweight server-rendered/vanilla JS — no heavy frontend framework"). This plan has no separate design doc; the design was worked out in conversation and is fully specified in this plan's tasks, including exact mockup values pulled from the approved Claude-Design mockup (a local HTML file, not included in this repo).
 
 ## Global Constraints
 
@@ -404,7 +406,7 @@ git commit -m "feat: PaddleOCR adapter emits line boxes and page image"
 - Consumes: `GET /engines` (existing, returns `{"engines": [str, ...]}`), `POST /ocr` (existing, `file` + repeated `engines` form fields + optional `refresh`).
 - Produces: a page with `id="engine-list"` (existing test `tests/test_web.py::test_index_page_loads` asserts this exact selector still exists — preserve it) and a new `id="run-all-btn"` button, `id="file-input"` file input, `id="results-grid"` container for Task 4 to render into.
 
-All values below are copied verbatim from `/Users/ali/Downloads/Compare engines-html/Main.dc.html` (the approved Claude-Design mockup).
+All values below are copied verbatim from the approved Claude-Design mockup (a local HTML file, not included in this repo).
 
 **Design tokens (put these in `dashboard.css` as CSS custom properties on `:root`):**
 
@@ -646,8 +648,8 @@ Expected: all 4 tests PASS.
 Start a local dev server (reuse the pattern already used earlier in this project — a free port, not 8000 if a Docker container is already running there):
 
 ```bash
-source /Users/ali/miniconda3/bin/activate ocrHub
-cd /Users/ali/Code/ocrHub
+conda activate ocrHub
+cd path/to/ocrHub
 python -c "
 import uvicorn
 from ocrhub.api import build_registry, create_app
@@ -656,7 +658,7 @@ uvicorn.run(app, host='0.0.0.0', port=8001)
 " &
 ```
 
-Use the `claude-in-chrome` tools (`tabs_context_mcp`, `navigate`, `computer` screenshot) to open `http://localhost:8001`, confirm the sidebar/header render with the right fonts/colors/spacing (compare against a screenshot of the original mockup at `/Users/ali/Downloads/Compare engines-html/Main.dc.html` if needed), and that clicking an engine row visually toggles its checkbox fill. Stop the server when done.
+Use the `claude-in-chrome` tools (`tabs_context_mcp`, `navigate`, `computer` screenshot) to open `http://localhost:8001`, confirm the sidebar/header render with the right fonts/colors/spacing (compare against a screenshot of the original mockup at the approved Claude-Design mockup (a local HTML file, not included in this repo) if needed), and that clicking an engine row visually toggles its checkbox fill. Stop the server when done.
 
 - [ ] **Step 6: Commit**
 

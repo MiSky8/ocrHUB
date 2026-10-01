@@ -284,6 +284,8 @@ pytest -q
 
 Engines are mocked, so no Docker or downloads are needed.
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) if you want to help.
+
 ## Why
 
 <!-- TODO: add your name/business and site link -->

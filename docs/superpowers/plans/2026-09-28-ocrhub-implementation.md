@@ -1,5 +1,7 @@
 # ocrHub Implementation Plan
 
+> **Historical note:** this document was written before the first release. PaddleOCR and the Ollama (DeepSeek) engine it describes were later removed, so ignore them. The rest is kept as written.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a single Docker image exposing multiple OCR engines (Tesseract, pdfplumber, Surya, PaddleOCR, DeepSeek-via-Ollama) behind one FastAPI service, reachable via a web UI, REST API, and MCP tool.
