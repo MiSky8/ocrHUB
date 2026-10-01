@@ -7,7 +7,6 @@ return very different amounts of detail. The dashboard draws whatever each
 engine actually provides and does not invent the rest. This page describes
 what each engine gives you, how it is drawn, and where it falls short.
 
-Screenshot spots are marked `<!-- screenshot: ... -->`.
 
 ## Contents
 
@@ -24,7 +23,11 @@ Screenshot spots are marked `<!-- screenshot: ... -->`.
 
 ## The dashboard
 
-<!-- screenshot: full dashboard with two or three engines on the receipt photo -->
+![The dashboard with the original page and the Tesseract, Surya and Datalab panels side by side, Text view on](images/dashboard-compare-engines.png)
+
+*Side by side on a PNG of part of the test PDF, with **Text** on. Tesseract
+took 1.9 s, Datalab 27 s and Surya 97 s. Surya's panel shows its raw output:
+LaTeX fragments such as `\left(` around the JSON braces.*
 
 - **Sidebar:** upload a file, tick the engines to run, and choose which
   finished results are shown.
@@ -72,7 +75,11 @@ embedded in a born-digital PDF, so it is fast (under a second) and exact,
 and it is the reference the other engines can be compared against.
 Code: `src/ocrhub/adapters/pdfplumber_adapter.py`.
 
-<!-- screenshot: pdfplumber on the born-digital PDF, Text on, Boxes on -->
+![pdfplumber on the test PDF: boxes drawn around each text line, with the code's real syntax colours](images/pdfplumber-pdf.png)
+
+*pdfplumber on the born-digital PDF (27 boxes, 0.3 s) with **Boxes** and
+**Text** on. Each run keeps its own colour, so the code's syntax highlighting
+survives.*
 
 **What the dashboard shows**
 
@@ -110,7 +117,11 @@ Code: `src/ocrhub/adapters/pdfplumber_adapter.py`.
 
 The classic baseline. Code: `src/ocrhub/adapters/tesseract_adapter.py`.
 
-<!-- screenshot: tesseract on the receipt photo, boxes + order numbers -->
+![Tesseract on an image of the test page: line boxes with order numbers 0 to 22](images/tesseract-image.png)
+
+*Tesseract on an image of the page (23 boxes, 78% confidence, 1.9 s) with
+**Boxes**, **Text** and **Order numbers** on. Reading order is one number per
+line, and misreads are visible, for example "03" for "Q3".*
 
 **What the dashboard shows**
 
@@ -140,7 +151,11 @@ detection and recognition (text lines and their text), then layout (labelled
 regions and a reading order) and table recognition (rows, columns and cells).
 Code: `src/ocrhub/adapters/surya_adapter.py`.
 
-<!-- screenshot: surya on the ocrdoc PDF: titles, text blocks, table, order badges -->
+![Surya on the test PDF: one box per region, with list markers read as \bullet](images/surya-pdf.png)
+
+*Surya on the same page (11 boxes, 94% confidence) with **Boxes** and
+**Text** on. The code lines are grouped into regions, and the list markers
+come out as `\bullet`.*
 
 **What the dashboard shows**
 
@@ -195,7 +210,11 @@ Code: `src/ocrhub/adapters/surya_adapter.py`.
 A hosted document-conversion API that returns a tree of layout blocks.
 Code: `src/ocrhub/adapters/datalab_adapter.py`.
 
-<!-- screenshot: datalab on the newspaper, Text on -->
+![Datalab on the test PDF: one box per block, with lists and code blocks kept together](images/datalab-pdf.png)
+
+*Datalab on the same page (9 boxes, 11 s) with **Boxes** and **Text** on. Each
+list, heading and code block is one block, with the bullets drawn from its
+html.*
 
 **What the dashboard shows**
 

@@ -69,6 +69,8 @@ docker run -p 8000:8000 \
   -v ocrhub-models:/home/ocrhub/.cache ocrhub
 ```
 
+![The ocrHub dashboard comparing Tesseract, Surya and Datalab side by side](docs/images/dashboard-compare-engines.png)
+
 Open `http://localhost:8000` to upload a document and compare engines
 side by side, or call the REST API directly:
 
