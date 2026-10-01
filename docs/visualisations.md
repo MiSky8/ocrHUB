@@ -23,11 +23,13 @@ what each engine gives you, how it is drawn, and where it falls short.
 
 ## The dashboard
 
-![The dashboard with the original page and the Tesseract, Surya and Datalab panels side by side, Text view on](images/dashboard-compare-engines.png)
+![The dashboard with the original page and the pdfplumber, Tesseract, Surya and Datalab panels side by side, page 1 of 4](images/dashboard-compare-engines.png)
 
-*Side by side on a PNG of part of the test PDF, with **Text** on. Tesseract
-took 1.9 s, Datalab 27 s and Surya 97 s. Surya's panel shows its raw output:
-LaTeX fragments such as `\left(` around the JSON braces.*
+*Side by side on page 1 of the 4-page test document, with **Boxes** and **Text**
+on. pdfplumber took 0.3 s, Tesseract 3.8 s and Datalab 10.9 s. pdfplumber and
+Surya draw the sales table as a grid, while Tesseract returns it as plain lines
+of text. The **Page** control in the toolbar steps through the other three
+pages.*
 
 - **Sidebar:** upload a file, tick the engines to run, and choose which
   finished results are shown.

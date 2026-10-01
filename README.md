@@ -5,7 +5,7 @@ the same "which OCR engine works best for this document" comparison
 by hand across two separate OCR pipeline projects — this bundles that
 comparison into something you can run in one command.
 
-![The ocrHub dashboard comparing Tesseract, Surya and Datalab side by side](docs/images/dashboard-compare-engines.png)
+![The ocrHub dashboard: the original page next to pdfplumber, Tesseract, Surya and Datalab](docs/images/dashboard-compare-engines.png)
 
 ## Included engines
 
