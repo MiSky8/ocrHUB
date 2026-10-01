@@ -20,8 +20,9 @@ First release. Version 0.1.0 matches `pyproject.toml`.
   (`refresh=true` forces a new run). If the folder can't be written, results are
   still returned.
 - A slim image (Tesseract and pdfplumber) on GitHub's container registry,
-  `ghcr.io/misky8/ocrhub`, for linux/amd64 and linux/arm64. Only the arm64
-  image has been run so far.
+  `ghcr.io/misky8/ocrhub`, for linux/amd64 and linux/arm64. The arm64 image was run
+  natively on Apple Silicon and the amd64 image under emulation on the same
+  machine; neither has been run on a Linux host.
 - Documentation: a README, a visualisation guide (`docs/visualisations.md`) and
   `CONTRIBUTING.md`.
 
