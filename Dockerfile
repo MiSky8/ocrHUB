@@ -14,6 +14,13 @@ COPY pyproject.toml ./
 # layer is cached and only re-runs when pyproject.toml or ENGINES change - not
 # on every source edit.
 ARG ENGINES=""
+# Surya needs torch, and on Linux PyPI's torch drags in several GB of NVIDIA CUDA
+# wheels that a CPU container never uses. Install the CPU build first; pip then
+# sees torch>=2.7 as already satisfied and leaves it alone.
+RUN case ",$ENGINES," in *,surya,*) \
+      pip install --no-cache-dir --upgrade pip \
+      && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu ;; \
+    esac
 RUN mkdir -p src/ocrhub && touch src/ocrhub/__init__.py \
     && pip install --no-cache-dir --upgrade pip \
     && if [ -n "$ENGINES" ]; then \

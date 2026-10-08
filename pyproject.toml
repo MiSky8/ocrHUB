@@ -33,11 +33,16 @@ dependencies = [
 # (Versions between 0.14.7 and the 0.20+ rewrite were not individually
 # checked - 0.14.7 is simply the one that was verified.)
 #
-# numpy<2 is also pinned: it is part of the environment this adapter was
-# verified in. (It was first added to avoid an opencv/NumPy clash with
-# PaddleOCR, which has since been removed; the pin was kept so the verified
-# environment doesn't change. Dropping it is untested.)
-surya = ["surya-ocr==0.14.7", "numpy<2"]
+# numpy<2 is no longer pinned: it was only kept from the old PaddleOCR 2.7.3
+# opencv clash. 0.14.7 was run on NumPy 2.3.5 / Python 3.13 in a conda env
+# (real photo, correct output); the Docker image check is still pending.
+surya = ["surya-ocr==0.14.7"]
+# Written against paddleocr 3.x (predict() API, PP-OCRv5 models), checked in a
+# local conda env (paddleocr 3.7.0, paddlepaddle 3.3.1, numpy 2.3.5). The Linux
+# wheels on PyPI stop at paddlepaddle 3.2.2, hence the 3.2 floor. Not yet
+# in the Docker image. The old 2.7.3 pins forced opencv 4.6 / numpy<2; 3.x
+# doesn't; installing it next to surya in the Docker image is still pending.
+paddleocr = ["paddleocr>=3.7,<4", "paddlepaddle>=3.2,<4"]
 # brotlicffi: Datalab's API responses are Brotli-encoded; the SDK's aiohttp
 # client needs this to decompress them (see agentVLM/pyproject.toml, which
 # vendors the same datalab_sdk usage this adapter is based on).
