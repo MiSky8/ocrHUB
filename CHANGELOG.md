@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- PaddleOCR engine (3.x, PP-OCRv5): line boxes and per-line confidence. Add with
+  `ENGINES=paddleocr`.
+- The `numpy<2` pin is gone; Surya 0.14.7 ran on NumPy 2.3.5.
+- With Surya in `ENGINES`, the Dockerfile installs CPU torch first, avoiding
+  several GB of CUDA packages.
+
 ## 0.1.0 (2026-10-01)
 
 First release. Version 0.1.0 matches `pyproject.toml`.

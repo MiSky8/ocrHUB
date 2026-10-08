@@ -15,11 +15,12 @@ what each engine gives you, how it is drawn, and where it falls short.
 3. [pdfplumber](#pdfplumber)
 4. [Tesseract](#tesseract)
 5. [Surya](#surya)
-6. [Datalab](#datalab)
-7. [Behaviour shared by all engines](#behaviour-shared-by-all-engines)
-8. [Demo files](#demo-files)
-9. [Versions](#versions)
-10. [Known limitations and untested parts](#known-limitations-and-untested-parts)
+6. [PaddleOCR](#paddleocr)
+7. [Datalab](#datalab)
+8. [Behaviour shared by all engines](#behaviour-shared-by-all-engines)
+9. [Demo files](#demo-files)
+10. [Versions](#versions)
+11. [Known limitations and untested parts](#known-limitations-and-untested-parts)
 
 ## The dashboard
 
@@ -51,20 +52,20 @@ pdfplumber appears immediately while Surya is still running.
 
 ## What each engine returns
 
-| | pdfplumber | Tesseract | Surya | Datalab |
-|---|---|---|---|---|
-| Input | PDF only (text layer) | image or PDF | image or PDF | image or PDF |
-| Is it OCR? | no, reads the PDF's text layer | yes | yes | yes (hosted API) |
-| Box granularity | text line (split at column gaps) | line, with words nested | layout region (lines with `SURYA_LAYOUT=0`) | layout block (paragraph, list, table, heading...) |
-| Reading order | yes, but geometric (top to bottom, left to right) | yes, from Tesseract's block/paragraph/line numbers | yes, from its layout model | yes, from the engine |
-| Confidence | no | per word, per line, per page | per region (mean of its lines), per page | no |
-| Region types | Text, Table, Picture | none | Title, Text, Table, Picture, Header, Footer, Caption, Equation, Code... | Title, Text, Table, Figure/Picture, Caption, Header, Footer |
-| Fonts and colours | yes: font, size, bold, italic, colour, per run | no | no | no (sizes are estimated, see below) |
-| Tables | real tables with cell alignment | no | yes, as html (table model) | yes, as html |
-| Pictures | cropped image | no | cropped image | cropped image plus alt text |
-| Original markup kept | no | no | no | yes: `html` per box and the untouched `raw` response |
-| Page image in result | no | yes | yes | no |
-| Coordinates | PDF points (about 595 wide for A4) | pixels | pixels | pixels (about 1600 wide in our tests) |
+| | pdfplumber | Tesseract | Surya | PaddleOCR | Datalab |
+|---|---|---|---|---|---|
+| Input | PDF only (text layer) | image or PDF | image or PDF | image or PDF | image or PDF |
+| Is it OCR? | no, reads the PDF's text layer | yes | yes | yes | yes (hosted API) |
+| Box granularity | text line (split at column gaps) | line, with words nested | layout region (lines with `SURYA_LAYOUT=0`) | text line | layout block (paragraph, list, table, heading...) |
+| Reading order | yes, but geometric (top to bottom, left to right) | yes, from Tesseract's block/paragraph/line numbers | yes, from its layout model | only the order lines come back in | yes, from the engine |
+| Confidence | no | per word, per line, per page | per region (mean of its lines), per page | per line, per page | no |
+| Region types | Text, Table, Picture | none | Title, Text, Table, Picture, Header, Footer, Caption, Equation, Code... | none | Title, Text, Table, Figure/Picture, Caption, Header, Footer |
+| Fonts and colours | yes: font, size, bold, italic, colour, per run | no | no | no | no (sizes are estimated, see below) |
+| Tables | real tables with cell alignment | no | yes, as html (table model) | no | yes, as html |
+| Pictures | cropped image | no | cropped image | no | cropped image plus alt text |
+| Original markup kept | no | no | no | no | yes: `html` per box and the untouched `raw` response |
+| Page image in result | no | yes | yes | yes | no |
+| Coordinates | PDF points (about 595 wide for A4) | pixels | pixels | pixels | pixels (about 1600 wide in our tests) |
 
 The coordinate differences matter for visualisation: the same page has
 different box numbers for each engine, so the dashboard sizes order badges
@@ -207,6 +208,32 @@ come out as `\bullet`.*
   receipt photo's 29 lines into 3 regions (header, items, footer), so the
   block view is much coarser than Tesseract's lines there. All text is kept.
 
+## PaddleOCR
+
+A lightweight text detector plus recogniser (PP-OCRv5, English models), run
+locally. It returns recognised lines with a polygon and a confidence each, and
+nothing else: no layout regions, no tables, no pictures, and no reading order
+beyond the order the lines come back in. Code:
+`src/ocrhub/adapters/paddleocr_adapter.py`.
+
+- **Boxes:** one per line, as the min/max of the line's polygon, so a rotated
+  line gets an upright box around it. Box confidence is 0 to 100; the page
+  confidence is the mean of the lines on a 0 to 1 scale, the same convention as
+  Surya.
+- **Orientation:** text-line orientation is on. The document orientation and
+  unwarping models are off, because they rewrite the page geometry and the
+  boxes would no longer line up with the page image. Photos still need their EXIF
+  rotation applied first, which `normalize_image` in the service does for every
+  engine. Without it the engine read a phone photo sideways.
+- **Language:** hard-coded to `lang="en"`. It read the Polish receipt below
+  correctly, but other scripts need another model.
+- **What was checked:** one phone photo of a Polish receipt, 30 lines at 0.98
+  mean confidence, through the adapter in a local conda env and through
+  `POST /ocr` in the Docker image. PDFs, multi-page files and how the dashboard
+  draws these boxes were not checked.
+- **Speed:** about 29 s for that 3024 by 4032 photo on CPU once the models are
+  cached. A first run also downloads the models.
+
 ## Datalab
 
 A hosted document-conversion API that returns a tree of layout blocks.
@@ -307,12 +334,13 @@ dates are from PyPI, checked on 2026-10-01.
 | Component | Used | Latest | Why this version |
 |---|---|---|---|
 | surya-ocr | 0.14.7 (2025-07-25), pinned | 0.22.1 (2026-07-20) | The 0.20+ line (0.20.0 is 2026-05-27) rewrote recognition around a VLM backend that needs an external llama-server or a GPU, with a different call signature and no per-line confidence. 0.14.7 is the version verified against this adapter. 0.15.0 to 0.17.1 (2025-08 to 2026-01) were not individually tested. |
-| numpy | below 2, pinned | | Kept from the environment this was verified in. It was first needed for PaddleOCR, which has been removed. |
-| Python | 3.11 (`python:3.11-slim`) | | The project requires 3.11 or newer. Surya allows 3.10 or newer. Newer Pythons were not tested with the pinned engines. |
+| paddleocr, paddlepaddle | 3.7.0, 3.2.2 (`paddleocr>=3.7,<4`, `paddlepaddle>=3.2,<4`) | 3.7.0, 3.3.1 on macOS | PyPI's Linux wheels stop at paddlepaddle 3.2.2; macOS has 3.3.1, which gave the same text on the test photo. paddleocr 2.7.3 (the line this adapter was first written for) is not used. |
+| numpy | 2.3.5, not pinned | | Surya 0.14.7 does not declare a NumPy limit. It ran on NumPy 2.3.5 in the Docker image (Python 3.11) and in a conda env on Python 3.13, so the old `numpy<2` pin, which dated from PaddleOCR 2.7.3's opencv clash, was dropped. Checked on one photo, not on a full document set. |
+| Python | 3.11 (`python:3.11-slim`) | | The project requires 3.11 or newer. Surya allows 3.10 or newer. Surya 0.14.7 also ran on 3.13 in a conda env, and PaddleOCR installed there (it was run on 3.11). The Docker image is still 3.11. Python 3.14 was not tried; Surya pins Pillow 10, which may not have 3.14 wheels. |
 | Tesseract | 5.5.0 | | Installed from Debian by `apt` in the Dockerfile, so the version follows the base image. |
 | pytesseract | 0.3.13 (2024-08-16) | 0.3.13 | Not pinned, and already the latest. |
 | pdfplumber | 0.11.9 (2026-01-05) | 0.11.10 (2026-06-15) | Not pinned (0.11 or newer), so a rebuild can pick up newer releases. |
-| torch, transformers | 2.14.0, 4.53.3 | | Not pinned by us. They are whatever Surya's pinned release resolved to at build time. |
+| torch, transformers | 2.14.1 (CPU build), 4.53.3 | | Not pinned by us. They are whatever Surya's pinned release resolved to at build time. The Dockerfile installs torch from PyTorch's CPU index first, so the image skips the NVIDIA CUDA packages. |
 
 **What upgrading Surya would change.** Moving to the 0.20+ line is not a
 version bump. The recognition call changes, per-line confidence goes away
@@ -329,12 +357,15 @@ been tried.
 ## Known limitations and untested parts
 
 - **Not tested:** the Overlay view.
-- **Removed engines:** PaddleOCR and the Ollama (DeepSeek) engine were
-  removed before the first release because they had never been tested here.
-  They remain in the git history before the removal commit.
+- **Removed engine:** the Ollama (DeepSeek) engine was removed before the
+  first release because it had never been tested here. It remains in the git
+  history before the removal commit. PaddleOCR was removed with it and has
+  since been brought back, rewritten for the 3.x API.
+- **PaddleOCR:** only checked on one photo; PDFs, multi-page files and the
+  dashboard view are untested, and the language is fixed to English.
 - **HEIC** uploads are unsupported.
 - **No refresh button** in the UI to bypass the cache.
 - **Surya:** emits LaTeX such as `\triangle` and `\bullet`.
 - **Datalab on the receipt photo** needs a look.
-- Reading order comes from all four engines, though pdfplumber's is
+- Reading order comes from the four engines that have it (PaddleOCR only keeps the order lines come back in), though pdfplumber's is
   geometric and Surya's needs the layout step (`SURYA_LAYOUT` on).

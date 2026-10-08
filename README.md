@@ -27,10 +27,12 @@ Want to know what each engine can and can't do? See the
 | Tesseract | 5.5.0 (pytesseract 0.3.13) | text, per-word confidence, line boxes | local, always included |
 | pdfplumber | 0.11.9 | the text layer of born-digital PDFs: fonts, colours, tables | local, always included |
 | Surya | 0.14.7 (models: detection 2025-05-07, recognition 2025-05-16, layout and tables 2025-02-18) | line OCR, layout regions, reading order, tables | local, add with `ENGINES=surya` |
+| PaddleOCR | 3.7.0 (paddlepaddle 3.2.2, PP-OCRv5 English models) | line OCR: text, line boxes, per-line confidence | local, add with `ENGINES=paddleocr` |
 | Datalab | hosted API (`datalab-python-sdk` 0.5.0, mode `accurate`) | layout blocks, html tables, pictures | cloud, add with `ENGINES=datalab` and a `DATALAB_API_KEY` (paid, free monthly tier: [datalab.to](https://www.datalab.to)) |
 
 These are the versions in an image built with all engines. The published image
-has only Tesseract and pdfplumber. Surya is pinned to 0.14.7; the others follow
+has only Tesseract and pdfplumber. Surya is pinned to 0.14.7; PaddleOCR needs
+3.x (`paddleocr>=3.7,<4`); the others follow
 what the image build installs. [docs/visualisations.md](docs/visualisations.md)
 explains what each engine returns, how the dashboard draws it, and why newer
 Surya releases aren't used yet.
@@ -45,8 +47,8 @@ mkdir -p data
 docker run -p 8000:8000 -v "$PWD/data:/home/ocrhub/data" ghcr.io/misky8/ocrhub:latest
 ```
 
-Open <http://localhost:8000>. Surya and Datalab aren't in that image (Surya
-alone adds several GB), so to use them build from source as below. Version tags
+Open <http://localhost:8000>. Surya, PaddleOCR and Datalab aren't in that image
+(Surya alone adds several GB), so to use them build from source as below. Version tags
 such as `ghcr.io/misky8/ocrhub:0.1.0` are available too.
 
 **Build it yourself,** from this folder, with Docker running:
@@ -58,11 +60,11 @@ docker compose up --build
 
 Open <http://localhost:8000>. Stop it with `Ctrl+C`.
 
-That builds the smallest image: Tesseract and pdfplumber. To add Surya or
-Datalab, copy the config template, edit it, and rebuild:
+That builds the smallest image: Tesseract and pdfplumber. To add Surya,
+PaddleOCR or Datalab, copy the config template, edit it, and rebuild:
 
 ```bash
-cp .env.example .env       # set ENGINES=surya,datalab and DATALAB_API_KEY
+cp .env.example .env       # set ENGINES=surya,paddleocr,datalab and DATALAB_API_KEY
 docker compose up --build
 ```
 
@@ -70,14 +72,18 @@ docker compose up --build
   minutes. After that, code-only rebuilds take seconds. Only changing
   `ENGINES` or `pyproject.toml` reinstalls the packages.
 - **Surya downloads its models on first use** (about 2 GB, kept in a Docker
-  volume so it happens once), so its first run is slow too.
+  volume so it happens once), so its first run is slow too. PaddleOCR does the
+  same with its PP-OCRv5 models.
+- **With `surya` in `ENGINES`, the Dockerfile installs the CPU build of torch
+  first.** Otherwise PyPI's Linux torch pulls several GB of NVIDIA CUDA
+  packages a CPU container can't use.
 - `.env` is gitignored, so it's yours. Changing `ENGINES` needs a rebuild;
   other settings (such as `DATALAB_API_KEY`) only need `docker compose up`.
 
 Without Compose:
 
 ```bash
-docker build --build-arg ENGINES=surya,datalab -t ocrhub .
+docker build --build-arg ENGINES=surya,paddleocr,datalab -t ocrhub .
 docker run -p 8000:8000 \
   -e DATALAB_API_KEY=your-key-here \
   -v ocrhub-models:/home/ocrhub/.cache \
