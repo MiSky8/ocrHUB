@@ -17,6 +17,9 @@ class TesseractAdapter:
     def available(self) -> bool:
         return shutil.which("tesseract") is not None
 
+    def capabilities(self) -> list[str]:
+        return []
+
     def extract(self, file_bytes: bytes, filename: str) -> OcrResult:
         start = time.monotonic()
 

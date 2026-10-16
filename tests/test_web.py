@@ -37,3 +37,10 @@ def test_dashboard_css_is_served(tmp_path):
 
     assert resp.status_code == 200
     assert "text/css" in resp.headers["content-type"]
+
+
+def test_app_js_has_capability_note(tmp_path):
+    client = TestClient(create_app(build_registry(), ResultStore(tmp_path)))
+    js = client.get("/static/app.js").text
+    assert "capabilityNote" in js
+    assert "No figure detection" in js

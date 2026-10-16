@@ -47,7 +47,7 @@ def create_app(registry: EngineRegistry | None = None, store: ResultStore | None
 
     @app.get("/engines")
     def engines() -> dict:
-        return {"engines": registry.available_engines()}
+        return {"engines": registry.available_engines(), "capabilities": registry.capabilities()}
 
     @app.post("/ocr")
     async def ocr(

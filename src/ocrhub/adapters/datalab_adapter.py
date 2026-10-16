@@ -115,6 +115,9 @@ class DatalabAdapter:
     def available(self) -> bool:
         return bool(self.api_key)
 
+    def capabilities(self) -> list[str]:
+        return ["Text", "Title", "Table", "Caption", "Header", "Footer", "Picture"]
+
     def extract(self, file_bytes: bytes, filename: str) -> OcrResult:
         start = time.monotonic()
         try:

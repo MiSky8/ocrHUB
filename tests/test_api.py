@@ -49,7 +49,7 @@ def test_health(tmp_path):
 def test_engines_lists_available_only(tmp_path):
     resp = _client(tmp_path).get("/engines")
     assert resp.status_code == 200
-    assert resp.json() == {"engines": ["stub"]}
+    assert resp.json() == {"engines": ["stub"], "capabilities": {"stub": []}}
 
 
 def test_ocr_runs_requested_engine(tmp_path):
@@ -93,3 +93,22 @@ def test_build_registry_registers_all_five_engines():
         "paddleocr",
         "datalab",
     }
+
+
+def test_real_adapter_capabilities():
+    from ocrhub.adapters.pdfplumber_adapter import PdfplumberAdapter
+    from ocrhub.adapters.tesseract_adapter import TesseractAdapter
+    from ocrhub.adapters.datalab_adapter import DatalabAdapter
+
+    assert "Picture" in PdfplumberAdapter().capabilities()
+    assert TesseractAdapter().capabilities() == []
+    assert "Picture" in DatalabAdapter().capabilities()
+
+
+def test_surya_capabilities_follow_surya_layout(monkeypatch):
+    from ocrhub.adapters.surya_adapter import SuryaAdapter
+
+    monkeypatch.setenv("SURYA_LAYOUT", "0")
+    assert SuryaAdapter().capabilities() == []
+    monkeypatch.setenv("SURYA_LAYOUT", "1")
+    assert "Picture" in SuryaAdapter().capabilities()

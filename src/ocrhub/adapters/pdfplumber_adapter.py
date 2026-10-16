@@ -240,6 +240,9 @@ class PdfplumberAdapter:
     def available(self) -> bool:
         return True
 
+    def capabilities(self) -> list[str]:
+        return ["Text", "Table", "Picture"]
+
     def extract(self, file_bytes: bytes, filename: str) -> OcrResult:
         if not is_pdf(filename):
             raise ValueError("pdfplumber adapter only accepts PDF files")

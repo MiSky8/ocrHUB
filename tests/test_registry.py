@@ -57,3 +57,24 @@ def test_get_unknown_engine_raises_key_error():
     registry = EngineRegistry()
     with pytest.raises(KeyError):
         registry.get("nope")
+
+
+def test_capabilities_reports_available_engines_and_defaults_to_empty():
+    class WithCaps:
+        name = "a"
+        def available(self): return True
+        def capabilities(self): return ["Picture"]
+
+    class NoCaps:
+        name = "b"
+        def available(self): return True
+
+    class Unavailable:
+        name = "c"
+        def available(self): return False
+        def capabilities(self): return ["Picture"]
+
+    registry = EngineRegistry()
+    for adapter in (WithCaps(), NoCaps(), Unavailable()):
+        registry.register(adapter)
+    assert registry.capabilities() == {"a": ["Picture"], "b": []}

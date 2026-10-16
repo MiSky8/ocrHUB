@@ -307,6 +307,9 @@ class SuryaAdapter:
                 ]
         return regions, tables
 
+    def capabilities(self) -> list[str]:
+        return ["Text", "Title", "Header", "Footer", "Table", "Picture"] if _layout_enabled() else []
+
     def extract(self, file_bytes: bytes, filename: str) -> OcrResult:
         start = time.monotonic()
 

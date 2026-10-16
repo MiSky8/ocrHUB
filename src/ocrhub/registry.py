@@ -18,6 +18,16 @@ class EngineRegistry:
                 continue
         return available
 
+    def capabilities(self) -> dict[str, list[str]]:
+        result: dict[str, list[str]] = {}
+        for name in self.available_engines():
+            method = getattr(self._adapters[name], "capabilities", None)
+            try:
+                result[name] = list(method()) if method else []
+            except Exception:  # noqa: BLE001 - one adapter must not break /engines
+                result[name] = []
+        return result
+
     def get(self, name: str) -> OcrAdapter:
         return self._adapters[name]
 

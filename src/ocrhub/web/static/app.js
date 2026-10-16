@@ -10,6 +10,7 @@ const PDF_ONLY = new Set(["pdfplumber"]);
 
 const state = {
   engines: [],
+  capabilities: {},
   selected: new Set(),   // engines to RUN
   file: null,
   results: {},
@@ -60,6 +61,7 @@ async function loadEngines() {
   const resp = await fetch("/engines");
   const data = await resp.json();
   state.engines = data.engines;
+  state.capabilities = data.capabilities || {};
   renderEngineList();
 }
 
@@ -536,6 +538,17 @@ function renderTextBody(result) {
   return body;
 }
 
+// Engines that cannot return pictures say so, so a blank figure area is not
+// mistaken for "nothing there". Driven by /engines, not by the current page.
+function capabilityNote(name) {
+  const caps = state.capabilities[name];
+  if (!caps || caps.includes("Picture")) return null;
+  const note = document.createElement("div");
+  note.className = "capability-note";
+  note.textContent = "No figure detection";
+  return note;
+}
+
 function renderPanel(name, result) {
   const panel = document.createElement("section");
   panel.className = "engine-panel";
@@ -581,6 +594,8 @@ function renderPanel(name, result) {
     stats.textContent = `${result.pages.length} page${result.pages.length === 1 ? "" : "s"} · text only · ${result.elapsed_ms} ms`;
     header.appendChild(stats);
     panel.appendChild(header);
+    const capNote = capabilityNote(name);
+    if (capNote) panel.appendChild(capNote);
     panel.appendChild(renderTextBody(result));
     return panel;
   }
@@ -590,6 +605,8 @@ function renderPanel(name, result) {
   stats.textContent = `${page.boxes.length} boxes · ${conf} conf · ${result.elapsed_ms} ms`;
   header.appendChild(stats);
   panel.appendChild(header);
+  const capNote = capabilityNote(name);
+  if (capNote) panel.appendChild(capNote);
 
   panel.appendChild(renderPageWithBoxes(page, name));
   return panel;
