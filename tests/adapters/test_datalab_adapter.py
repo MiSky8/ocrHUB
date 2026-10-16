@@ -11,8 +11,11 @@ def test_available_false_when_no_api_key(monkeypatch):
     assert DatalabAdapter(api_key=None).available() is False
 
 
-def test_available_true_when_api_key_set():
-    assert DatalabAdapter(api_key="fake-key").available() is True
+def test_available_true_when_api_key_set_and_sdk_installed():
+    from unittest.mock import MagicMock, patch
+
+    with patch.dict("sys.modules", {"datalab_sdk": MagicMock()}):
+        assert DatalabAdapter(api_key="fake-key").available() is True
 
 
 def test_parse_datalab_json_flattens_blocks_in_reading_order():
@@ -86,3 +89,11 @@ def test_parse_datalab_json_keeps_pictures_with_alt_text_and_crop():
     assert picture.image == "QUJD"
     assert (picture.x0, picture.y0, picture.x1, picture.y1) == (10.0, 20.0, 110.0, 220.0)
     assert page.text == "Caption text"  # picture alt text stays out of the page text
+
+
+def test_available_false_when_sdk_not_installed():
+    """A key alone is not enough: the adapter imports datalab_sdk to run."""
+    from unittest.mock import patch
+
+    with patch.dict("sys.modules", {"datalab_sdk": None}):
+        assert DatalabAdapter(api_key="fake-key").available() is False

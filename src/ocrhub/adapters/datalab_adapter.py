@@ -113,7 +113,13 @@ class DatalabAdapter:
         self.mode = os.environ.get("DATALAB_MODE", "accurate")
 
     def available(self) -> bool:
-        return bool(self.api_key)
+        if not self.api_key:
+            return False
+        try:
+            import datalab_sdk  # noqa: F401
+        except ImportError:
+            return False
+        return True
 
     def capabilities(self) -> list[str]:
         return ["Text", "Title", "Table", "Caption", "Header", "Footer", "Picture"]
