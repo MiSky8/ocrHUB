@@ -39,8 +39,8 @@ dependencies = [
 surya = ["surya-ocr==0.14.7"]
 # Written against paddleocr 3.x (predict() API, PP-OCRv6 models), checked in a
 # local conda env (paddleocr 3.7.0, paddlepaddle 3.3.1, numpy 2.3.5). The Linux
-# wheels on PyPI stop at paddlepaddle 3.2.2, hence the 3.2 floor. Not yet
-# in the Docker image. The old 2.7.3 pins forced opencv 4.6 / numpy<2; 3.x
+# wheels on PyPI stop at paddlepaddle 3.2.2, hence the 3.2 floor. It also
+# runs in the Docker image (checked on the real container). The old 2.7.3 pins forced opencv 4.6 / numpy<2; 3.x
 # doesn't; installing it next to surya in the Docker image is still pending.
 paddleocr = ["paddleocr>=3.7,<4", "paddlepaddle>=3.2,<4"]
 # brotlicffi: Datalab's API responses are Brotli-encoded; the SDK's aiohttp

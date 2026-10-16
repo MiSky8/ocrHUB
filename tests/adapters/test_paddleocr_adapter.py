@@ -142,3 +142,20 @@ def test_layout_model_loaded_once_for_multi_page_pdf(sample_scanned_pdf_bytes, m
          patch.object(adapter, "_build_layout_model", return_value=_layout_model()) as build_layout:
         adapter.extract(sample_scanned_pdf_bytes, "s.pdf")
     assert build_layout.call_count == 1
+
+
+@pytest.mark.parametrize("bad_box", [
+    {"label": "text", "score": None, "coordinate": [0, 0, 200, 60]},
+    {"label": "text", "score": 0.9},
+])
+def test_malformed_layout_box_keeps_the_ocr_lines(sample_image_bytes, monkeypatch, caplog, bad_box):
+    monkeypatch.setenv("PADDLE_LAYOUT", "1")
+    adapter = PaddleOcrAdapter()
+    with patch.object(adapter, "_build_engine", return_value=_ocr_engine()), \
+         patch.object(adapter, "_build_layout_model", return_value=_layout_model(bad_box)):
+        result = adapter.extract(sample_image_bytes, "s.png")
+    assert result.ok is True
+    assert result.pages[0].boxes[0].text == "HELLO"
+    assert result.pages[0].boxes[0].region_type is None
+    assert result.pages[0].text == "HELLO"
+    assert "layout merge failed on page 1" in caplog.text

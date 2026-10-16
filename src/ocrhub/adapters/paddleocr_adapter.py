@@ -24,6 +24,18 @@ def _free_memory() -> None:
     gc.collect()
 
 
+def _plain_line_boxes(lines: list[dict]) -> list[BoxResult]:
+    return [
+        BoxResult(
+            text=ln["text"],
+            x0=ln["bbox"][0], y0=ln["bbox"][1], x1=ln["bbox"][2], y1=ln["bbox"][3],
+            confidence=ln["confidence"] * 100,
+            reading_order=order,
+        )
+        for order, ln in enumerate(lines)
+    ]
+
+
 class PaddleOcrAdapter:
     name = "paddleocr"
 
@@ -117,20 +129,18 @@ class PaddleOcrAdapter:
             img = Image.open(io.BytesIO(page_bytes)).convert("RGB")
             confidences = [ln["confidence"] for ln in lines]
 
+            boxes = None
             if layouts is not None:
-                boxes = merge_layout(lines, layouts[i - 1], img)
-                text = "\n".join(b.text for b in boxes if b.text)
-            else:
-                boxes = [
-                    BoxResult(
-                        text=ln["text"],
-                        x0=ln["bbox"][0], y0=ln["bbox"][1], x1=ln["bbox"][2], y1=ln["bbox"][3],
-                        confidence=ln["confidence"] * 100,
-                        reading_order=order,
+                try:
+                    boxes = merge_layout(lines, layouts[i - 1], img)
+                except Exception:  # noqa: BLE001 - a bad layout box must not lose the OCR lines
+                    logger.warning(
+                        "PaddleOCR layout merge failed on page %d; returning plain lines",
+                        i, exc_info=True,
                     )
-                    for order, ln in enumerate(lines)
-                ]
-                text = "\n".join(ln["text"] for ln in lines)
+            if boxes is None:
+                boxes = _plain_line_boxes(lines)
+            text = "\n".join(b.text for b in boxes if b.text)
             confidence = sum(confidences) / len(confidences) if confidences else None
 
             png_buf = io.BytesIO()

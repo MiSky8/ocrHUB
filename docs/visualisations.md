@@ -56,9 +56,9 @@ pdfplumber appears immediately while Surya is still running.
 |---|---|---|---|---|---|
 | Input | PDF only (text layer) | image or PDF | image or PDF | image or PDF | image or PDF |
 | Is it OCR? | no, reads the PDF's text layer | yes | yes | yes | yes (hosted API) |
-| Box granularity | text line (split at column gaps) | line, with words nested | layout region (lines with `SURYA_LAYOUT=0`) | text line | layout block (paragraph, list, table, heading...) |
+| Box granularity | text line (split at column gaps) | line, with words nested | layout region (lines with `SURYA_LAYOUT=0`) | text line; typed regions with their lines joined with `PADDLE_LAYOUT=1` | layout block (paragraph, list, table, heading...) |
 | Reading order | yes, but geometric (top to bottom, left to right) | yes, from Tesseract's block/paragraph/line numbers | yes, from its layout model | only the order lines come back in; with `PADDLE_LAYOUT=1`, top to bottom then left to right | yes, from the engine |
-| Confidence | no | per word, per line, per page | per region (mean of its lines), per page | per line, per page | no |
+| Confidence | no | per word, per line, per page | per region (mean of its lines), per page | per line, per page (per region, mean of its lines, with `PADDLE_LAYOUT=1`; none on a Picture) | no |
 | Region types | Text, Table, Picture | none | Title, Text, Table, Picture, Header, Footer, Caption, Equation, Code... | none, or with `PADDLE_LAYOUT=1`: Text, Title, Caption, Header, Footer, Table, Formula, Picture | Title, Text, Table, Figure/Picture, Caption, Header, Footer |
 | Fonts and colours | yes: font, size, bold, italic, colour, per run | no | no | no | no (sizes are estimated, see below) |
 | Tables | real tables with cell alignment | no | yes, as html (table model) | table region only (with `PADDLE_LAYOUT=1`), no cells | yes, as html |
@@ -267,10 +267,15 @@ regions and figure crops (see below). Code:
 - **Time and memory (one file, the 4-page `OCR Test Document.pdf`, CPU, in
   Docker; two runs per setting, one right after a container recreate and one
   warm):** the warm runs took 160 s with layout on and 159 s with it off; the
-  runs right after a recreate took 176 s on and 165 s off. Container memory,
+  runs right after a recreate took 176 s on and 165 s off. Those two, and the
+  243 s run below, were measured before the `PADDLE_PDX_CACHE_HOME` setting
+  existed, when every recreate wiped `~/.paddlex` and re-downloaded all four
+  models (145 MB), so they include that download. After the fix a recreate no
+  longer downloads them. Container memory,
   sampled with `docker stats --no-stream` about every 2 s, peaked at 3321 to
   3389 MiB (about 3.2 to 3.3 GiB) in those four runs. The very first layout run after
-  the build, which included the layout model download, took 243 s and sampled
+  the build, which included downloading all four models (not just the layout
+  model), took 243 s and sampled
   at 3.334 GiB (about 3414 MiB). So the layout stage made no measurable
   difference on this file. Sampling can miss short spikes.
 - **What was checked:** two files through `POST /ocr` with `refresh=true` in the

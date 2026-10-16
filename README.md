@@ -27,7 +27,7 @@ Want to know what each engine can and can't do? See the
 | Tesseract | 5.5.0 (pytesseract 0.3.13) | text, per-word confidence, line boxes | local, always included |
 | pdfplumber | 0.11.9 | the text layer of born-digital PDFs: fonts, colours, tables | local, always included |
 | Surya | 0.14.7 (models: detection 2025-05-07, recognition 2025-05-16, layout and tables 2025-02-18) | line OCR, layout regions, reading order, tables | local, add with `ENGINES=surya` |
-| PaddleOCR | 3.7.0 (paddlepaddle 3.2.2, PP-OCRv6 English models) | line OCR: text, line boxes, per-line confidence | local, add with `ENGINES=paddleocr` |
+| PaddleOCR | 3.7.0 (paddlepaddle 3.2.2, PP-OCRv6 English models) | line OCR: text, line boxes, per-line confidence; with `PADDLE_LAYOUT=1` also typed regions and Picture crops | local, add with `ENGINES=paddleocr` |
 | Datalab | hosted API (`datalab-python-sdk` 0.5.0, mode `accurate`) | layout blocks, html tables, pictures | cloud, add with `ENGINES=datalab` and a `DATALAB_API_KEY` (paid, free monthly tier: [datalab.to](https://www.datalab.to)) |
 
 These are the versions in an image built with all engines. The published image
@@ -189,7 +189,9 @@ tests on a Docker Desktop Mac (8 GB limit), so treat them as rough:
   4-page PDF it made no measurable difference to time or memory (see
   `docs/visualisations.md`). It misses some figures and tables, and orders regions top to bottom then left to
   right. `/engines` reports each engine's `capabilities`, and the dashboard says
-  "No figure detection" for engines without Picture. Re-run with
+  "No figure detection" for engines without Picture (the dashboard rendering
+  of that note and of the PaddleOCR region boxes has not been checked
+  visually yet). Re-run with
   `refresh=true` after changing it: cached results keep the old output.
 - **Images** are normalised before any engine sees them: EXIF rotation applied,
   flattened to RGB, longest side capped at 3000 px, re-encoded as PNG. The

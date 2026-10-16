@@ -48,6 +48,8 @@ def _dedupe_pictures(regions: list[dict]) -> list[dict]:
     """PP-DocLayout often reports one figure as both `image` and `chart`; keep the best."""
     kept: list[dict] = []
     for r in sorted(regions, key=lambda r: -r["score"]):
+        # A small picture fully inside a larger one is deliberately dropped as a
+        # duplicate (the 0.8 * smaller-area test).
         if r["type"] == PICTURE and any(
             k["type"] == PICTURE
             and _overlap(k["bbox"], r["bbox"]) > 0.8 * min(_area(k["bbox"]), _area(r["bbox"]))
