@@ -210,7 +210,7 @@ come out as `\bullet`.*
 
 ## PaddleOCR
 
-A lightweight text detector plus recogniser (PP-OCRv5, English models), run
+A lightweight text detector plus recogniser (PP-OCRv6 medium detection and recognition models, English), run
 locally. By default it returns recognised lines with a polygon and a confidence
 each, and no layout regions, tables or pictures. With `PADDLE_LAYOUT=1` it also
 runs a layout model (PP-DocLayout-S) after recognition and returns typed
@@ -251,10 +251,11 @@ regions and figure crops (see below). Code:
 - **Reading order:** the layout model gives none, so regions and leftover lines
   are ordered top to bottom, then left to right. Multi-column pages will be
   misordered.
-- **Figures:** lines inside a figure stay as separate line boxes. The Picture
-  crop is added next to them.
-- **Failure:** if the layout stage fails, the error is logged and plain lines
-  are returned; the result is not marked as failed and shows no warning.
+- **Figures:** by design, lines inside a figure stay as separate line boxes and
+  the Picture crop is added next to them (not observed: the test graphic had
+  no text lines).
+- **Failure:** by design (not triggered in the real checks), if the layout
+  stage fails, the error is logged and plain lines are returned; the result is not marked as failed and shows no warning.
 - **First run** downloads the layout model (the four PaddleOCR models are about
   145 MB). They are cached under `/home/ocrhub/.cache/paddlex` (the
   `PADDLE_PDX_CACHE_HOME` setting in `docker-compose.yml`), which is on the
@@ -263,27 +264,38 @@ regions and figure crops (see below). Code:
   downloaded the models again.
 - **Cached results:** results are cached by file content, so re-run with
   `refresh=true` after upgrading or toggling `PADDLE_LAYOUT`.
-- **Time and memory (4-page `OCR Test Document.pdf`, CPU, in Docker):** warm
-  runs took 160 s with layout on and 159 s with it off. Container memory,
-  sampled with `docker stats --no-stream` about every 2 s, peaked around 3.3 to
-  3.4 GiB either way, so the layout stage made no measurable difference. The
-  first run after a build, which includes the layout model download, took 243
-  s. Sampling can miss short spikes.
+- **Time and memory (one file, the 4-page `OCR Test Document.pdf`, CPU, in
+  Docker; two runs per setting, one right after a container recreate and one
+  warm):** the warm runs took 160 s with layout on and 159 s with it off; the
+  runs right after a recreate took 176 s on and 165 s off. Container memory,
+  sampled with `docker stats --no-stream` about every 2 s, peaked at 3321 to
+  3389 MiB (about 3.3 GB) in those four runs. The very first layout run after
+  the build, which included the layout model download, took 243 s and sampled
+  at 3.334 GiB (about 3414 MiB). So the layout stage made no measurable
+  difference on this file. Sampling can miss short spikes.
 - **What was checked:** two files through `POST /ocr` with `refresh=true` in the
   Docker image (`ENGINES=paddleocr`), reading the JSON. The dashboard rendering
   was not exercised by this check.
   - `OCR Test Document.pdf`, page 4: the node graphic was a Picture with a
     correct crop, and the table was one Table region. Page 1's sales table and
     page 3's code blocks were not detected as regions (their lines stayed
-    plain), and on page 1 only about 8 of 45 lines got a region type.
+    plain). On page 1, 8 of the 45 boxes are typed regions (5 Title, 3 Text)
+    and the other 37 are plain lines.
   - `A Framework Guide for Structured Expression.pdf`: the full-bleed cover
-    illustration was not detected as a Picture (no Picture on any page); the
+    illustration was not detected as a Picture (no Picture came back on any
+    page; the cause was not examined); the
     title was a Title region, and the logo, subtitle and tagline stayed plain
     lines.
-  - With `PADDLE_LAYOUT=0` the same PDF returned plain line boxes, all with
-    `region_type` null.
-  These misses are limits of PP-DocLayout-S. Other PP-DocLayout variants might
-  do better; they were not tried.
+  - With `PADDLE_LAYOUT=0`, `OCR Test Document.pdf` returned plain line boxes
+    with `region_type` null on all 4 pages (49, 35, 25 and 15 boxes) and no
+    crops.
+  - For `OCR Test Document.pdf`, the controller ran PP-DocLayout-S directly
+    (`LayoutDetection`) at 200 dpi: page 1 returned five `paragraph_title` and
+    three `text` boxes and no table; page 3 returned one `paragraph_title` and
+    one `text` box and no table. So on those pages the layout model itself
+    returned no table, and our merge is not dropping any. The cover's raw
+    model output was not checked. Other PP-DocLayout variants might do better;
+    they were not tried.
 
 ## Datalab
 

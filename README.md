@@ -27,7 +27,7 @@ Want to know what each engine can and can't do? See the
 | Tesseract | 5.5.0 (pytesseract 0.3.13) | text, per-word confidence, line boxes | local, always included |
 | pdfplumber | 0.11.9 | the text layer of born-digital PDFs: fonts, colours, tables | local, always included |
 | Surya | 0.14.7 (models: detection 2025-05-07, recognition 2025-05-16, layout and tables 2025-02-18) | line OCR, layout regions, reading order, tables | local, add with `ENGINES=surya` |
-| PaddleOCR | 3.7.0 (paddlepaddle 3.2.2, PP-OCRv5 English models) | line OCR: text, line boxes, per-line confidence | local, add with `ENGINES=paddleocr` |
+| PaddleOCR | 3.7.0 (paddlepaddle 3.2.2, PP-OCRv6 English models) | line OCR: text, line boxes, per-line confidence | local, add with `ENGINES=paddleocr` |
 | Datalab | hosted API (`datalab-python-sdk` 0.5.0, mode `accurate`) | layout blocks, html tables, pictures | cloud, add with `ENGINES=datalab` and a `DATALAB_API_KEY` (paid, free monthly tier: [datalab.to](https://www.datalab.to)) |
 
 These are the versions in an image built with all engines. The published image
@@ -73,7 +73,7 @@ docker compose up --build
   `ENGINES` or `pyproject.toml` reinstalls the packages.
 - **Surya downloads its models on first use** (about 2 GB, kept in a Docker
   volume so it happens once), so its first run is slow too. PaddleOCR does the
-  same with its PP-OCRv5 models.
+  same with its PP-OCRv6 models.
 - **With `surya` in `ENGINES`, the Dockerfile installs the CPU build of torch
   first.** Otherwise PyPI's Linux torch pulls several GB of NVIDIA CUDA
   packages a CPU container can't use.
@@ -185,9 +185,9 @@ tests on a Docker Desktop Mac (8 GB limit), so treat them as rough:
   `SURYA_LAYOUT=0` in `.env` to skip them and get plain lines.
 - **PaddleOCR's layout stage** is off by default. `PADDLE_LAYOUT=1` in `.env`
   runs PP-DocLayout-S after recognition and returns typed regions (Title, Text,
-  Table, Picture...) and figure crops. It adds one small model download and no
-  measurable time or memory in our test (see `docs/visualisations.md`). It
-  misses some figures and tables, and orders regions top to bottom then left to
+  Table, Picture...) and figure crops. It adds one small model download; on one
+  4-page PDF it made no measurable difference to time or memory (see
+  `docs/visualisations.md`). It misses some figures and tables, and orders regions top to bottom then left to
   right. `/engines` reports each engine's `capabilities`, and the dashboard says
   "No figure detection" for engines without Picture. Re-run with
   `refresh=true` after changing it: cached results keep the old output.
