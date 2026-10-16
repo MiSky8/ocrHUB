@@ -269,7 +269,7 @@ regions and figure crops (see below). Code:
   warm):** the warm runs took 160 s with layout on and 159 s with it off; the
   runs right after a recreate took 176 s on and 165 s off. Container memory,
   sampled with `docker stats --no-stream` about every 2 s, peaked at 3321 to
-  3389 MiB (about 3.3 GB) in those four runs. The very first layout run after
+  3389 MiB (about 3.2 to 3.3 GiB) in those four runs. The very first layout run after
   the build, which included the layout model download, took 243 s and sampled
   at 3.334 GiB (about 3414 MiB). So the layout stage made no measurable
   difference on this file. Sampling can miss short spikes.
