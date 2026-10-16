@@ -57,12 +57,12 @@ pdfplumber appears immediately while Surya is still running.
 | Input | PDF only (text layer) | image or PDF | image or PDF | image or PDF | image or PDF |
 | Is it OCR? | no, reads the PDF's text layer | yes | yes | yes | yes (hosted API) |
 | Box granularity | text line (split at column gaps) | line, with words nested | layout region (lines with `SURYA_LAYOUT=0`) | text line | layout block (paragraph, list, table, heading...) |
-| Reading order | yes, but geometric (top to bottom, left to right) | yes, from Tesseract's block/paragraph/line numbers | yes, from its layout model | only the order lines come back in | yes, from the engine |
+| Reading order | yes, but geometric (top to bottom, left to right) | yes, from Tesseract's block/paragraph/line numbers | yes, from its layout model | only the order lines come back in; with `PADDLE_LAYOUT=1`, top to bottom then left to right | yes, from the engine |
 | Confidence | no | per word, per line, per page | per region (mean of its lines), per page | per line, per page | no |
-| Region types | Text, Table, Picture | none | Title, Text, Table, Picture, Header, Footer, Caption, Equation, Code... | none | Title, Text, Table, Figure/Picture, Caption, Header, Footer |
+| Region types | Text, Table, Picture | none | Title, Text, Table, Picture, Header, Footer, Caption, Equation, Code... | none, or with `PADDLE_LAYOUT=1`: Text, Title, Caption, Header, Footer, Table, Formula, Picture | Title, Text, Table, Figure/Picture, Caption, Header, Footer |
 | Fonts and colours | yes: font, size, bold, italic, colour, per run | no | no | no | no (sizes are estimated, see below) |
-| Tables | real tables with cell alignment | no | yes, as html (table model) | no | yes, as html |
-| Pictures | cropped image | no | cropped image | no | cropped image plus alt text |
+| Tables | real tables with cell alignment | no | yes, as html (table model) | table region only (with `PADDLE_LAYOUT=1`), no cells | yes, as html |
+| Pictures | cropped image | no | cropped image | cropped image (with `PADDLE_LAYOUT=1`) | cropped image plus alt text |
 | Original markup kept | no | no | no | no | yes: `html` per box and the untouched `raw` response |
 | Page image in result | no | yes | yes | yes | no |
 | Coordinates | PDF points (about 595 wide for A4) | pixels | pixels | pixels | pixels (about 1600 wide in our tests) |
@@ -211,10 +211,11 @@ come out as `\bullet`.*
 ## PaddleOCR
 
 A lightweight text detector plus recogniser (PP-OCRv5, English models), run
-locally. It returns recognised lines with a polygon and a confidence each, and
-nothing else: no layout regions, no tables, no pictures, and no reading order
-beyond the order the lines come back in. Code:
-`src/ocrhub/adapters/paddleocr_adapter.py`.
+locally. By default it returns recognised lines with a polygon and a confidence
+each, and no layout regions, tables or pictures. With `PADDLE_LAYOUT=1` it also
+runs a layout model (PP-DocLayout-S) after recognition and returns typed
+regions and figure crops (see below). Code:
+`src/ocrhub/adapters/paddleocr_adapter.py`, `src/ocrhub/adapters/_paddle_layout.py`.
 
 - **Boxes:** one per line, as the min/max of the line's polygon, so a rotated
   line gets an upright box around it. Box confidence is 0 to 100; the page
@@ -227,12 +228,62 @@ beyond the order the lines come back in. Code:
   engine. Without it the engine read a phone photo sideways.
 - **Language:** hard-coded to `lang="en"`. It read the Polish receipt below
   correctly, but other scripts need another model.
-- **What was checked:** one phone photo of a Polish receipt, 30 lines at 0.98
-  mean confidence, through the adapter in a local conda env and through
-  `POST /ocr` in the Docker image. PDFs, multi-page files and how the dashboard
-  draws these boxes were not checked.
+- **What was checked (text lines):** one phone photo of a Polish receipt, 30
+  lines at 0.98 mean confidence, through the adapter in a local conda env and
+  through `POST /ocr` in the Docker image.
 - **Speed:** about 29 s for that 3024 by 4032 photo on CPU once the models are
   cached. A first run also downloads the models.
+
+### Layout stage (`PADDLE_LAYOUT=1`, off by default)
+
+- **What it returns:** after the lines are read, PP-DocLayout-S finds regions on
+  the page. Each region becomes one box with a `region_type`, and the lines it
+  contains are merged into its text. Lines no region covers stay as plain line
+  boxes with `region_type` null. A Picture region carries a cropped `image`.
+- **Label mapping:** `text`, `abstract`, `content`, `reference`,
+  `reference_content`, `aside_text`, `footnote` give Text; `paragraph_title`,
+  `doc_title` give Title; `figure_title` gives Caption; `header`, `footer`,
+  `table` and `formula` give Header, Footer, Table and Formula; `image`, `chart`
+  and `seal` give Picture. Other labels (page and formula numbers) are ignored,
+  so their lines stay plain.
+- **Tables** are regions with their lines inside. There is no cell grid and no
+  html, unlike Surya and Datalab.
+- **Reading order:** the layout model gives none, so regions and leftover lines
+  are ordered top to bottom, then left to right. Multi-column pages will be
+  misordered.
+- **Figures:** lines inside a figure stay as separate line boxes. The Picture
+  crop is added next to them.
+- **Failure:** if the layout stage fails, the error is logged and plain lines
+  are returned; the result is not marked as failed and shows no warning.
+- **First run** downloads the layout model (the four PaddleOCR models are about
+  145 MB). They are cached under `/home/ocrhub/.cache/paddlex` (the
+  `PADDLE_PDX_CACHE_HOME` setting in `docker-compose.yml`), which is on the
+  `ocrhub-models` volume. Before that setting, PaddleX cached in
+  `~/.paddlex`, which was not on a volume, so every container recreate
+  downloaded the models again.
+- **Cached results:** results are cached by file content, so re-run with
+  `refresh=true` after upgrading or toggling `PADDLE_LAYOUT`.
+- **Time and memory (4-page `OCR Test Document.pdf`, CPU, in Docker):** warm
+  runs took 160 s with layout on and 159 s with it off. Container memory,
+  sampled with `docker stats --no-stream` about every 2 s, peaked around 3.3 to
+  3.4 GiB either way, so the layout stage made no measurable difference. The
+  first run after a build, which includes the layout model download, took 243
+  s. Sampling can miss short spikes.
+- **What was checked:** two files through `POST /ocr` with `refresh=true` in the
+  Docker image (`ENGINES=paddleocr`), reading the JSON. The dashboard rendering
+  was not exercised by this check.
+  - `OCR Test Document.pdf`, page 4: the node graphic was a Picture with a
+    correct crop, and the table was one Table region. Page 1's sales table and
+    page 3's code blocks were not detected as regions (their lines stayed
+    plain), and on page 1 only about 8 of 45 lines got a region type.
+  - `A Framework Guide for Structured Expression.pdf`: the full-bleed cover
+    illustration was not detected as a Picture (no Picture on any page); the
+    title was a Title region, and the logo, subtitle and tagline stayed plain
+    lines.
+  - With `PADDLE_LAYOUT=0` the same PDF returned plain line boxes, all with
+    `region_type` null.
+  These misses are limits of PP-DocLayout-S. Other PP-DocLayout variants might
+  do better; they were not tried.
 
 ## Datalab
 
@@ -361,8 +412,9 @@ been tried.
   first release because it had never been tested here. It remains in the git
   history before the removal commit. PaddleOCR was removed with it and has
   since been brought back, rewritten for the 3.x API.
-- **PaddleOCR:** only checked on one photo; PDFs, multi-page files and the
-  dashboard view are untested, and the language is fixed to English.
+- **PaddleOCR:** the layout stage was checked on two PDFs through the API only;
+  the dashboard view is untested, the layout model misses some figures and
+  tables, and the language is fixed to English.
 - **HEIC** uploads are unsupported.
 - **No refresh button** in the UI to bypass the cache.
 - **Surya:** emits LaTeX such as `\triangle` and `\bullet`.

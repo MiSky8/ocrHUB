@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- PaddleOCR layout regions and figure crops with `PADDLE_LAYOUT=1` (PP-DocLayout-S);
+  `/engines` reports capabilities; dashboard labels engines without figure
+  detection. Re-run with `refresh=true` after upgrading: cached results keep the
+  old output.
+- PaddleOCR models are now cached in the `ocrhub-models` volume
+  (`PADDLE_PDX_CACHE_HOME`); they were re-downloaded on every container recreate.
 - PaddleOCR engine (3.x, PP-OCRv5): line boxes and per-line confidence. Add with
   `ENGINES=paddleocr`.
 - The `numpy<2` pin is gone; Surya 0.14.7 ran on NumPy 2.3.5.

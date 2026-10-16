@@ -183,6 +183,14 @@ tests on a Docker Desktop Mac (8 GB limit), so treat them as rough:
 - **Surya's layout and table models** run after text recognition and give it
   regions, reading order and tables. They cost some time and memory. Set
   `SURYA_LAYOUT=0` in `.env` to skip them and get plain lines.
+- **PaddleOCR's layout stage** is off by default. `PADDLE_LAYOUT=1` in `.env`
+  runs PP-DocLayout-S after recognition and returns typed regions (Title, Text,
+  Table, Picture...) and figure crops. It adds one small model download and no
+  measurable time or memory in our test (see `docs/visualisations.md`). It
+  misses some figures and tables, and orders regions top to bottom then left to
+  right. `/engines` reports each engine's `capabilities`, and the dashboard says
+  "No figure detection" for engines without Picture. Re-run with
+  `refresh=true` after changing it: cached results keep the old output.
 - **Images** are normalised before any engine sees them: EXIF rotation applied,
   flattened to RGB, longest side capped at 3000 px, re-encoded as PNG. The
   original is kept untouched in `data/input`.

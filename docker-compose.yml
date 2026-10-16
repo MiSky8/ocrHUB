@@ -25,8 +25,16 @@ services:
       - SURYA_LAYOUT=${SURYA_LAYOUT:-1}
       - LAYOUT_BATCH_SIZE=${SURYA_LAYOUT_BATCH_SIZE:-2}
       - TABLE_REC_BATCH_SIZE=${SURYA_TABLE_REC_BATCH_SIZE:-2}
+      # PaddleOCR layout regions (figures, tables, titles) via PP-DocLayout-S.
+      # Off by default: adds one small model download and a little time.
+      - PADDLE_LAYOUT=${PADDLE_LAYOUT:-0}
+      # PaddleX defaults to ~/.paddlex, which is not on a volume, so every
+      # container recreate re-downloaded the PaddleOCR models.
+      - PADDLE_PDX_CACHE_HOME=/home/ocrhub/.cache/paddlex
     volumes:
-      # Persists downloaded Surya/PaddleOCR model weights across restarts.
+      # Persists downloaded model weights across restarts: Surya and Datalab
+      # cache under ~/.cache; PaddleOCR's PaddleX cache is pointed there too
+      # (PADDLE_PDX_CACHE_HOME above).
       - ocrhub-models:/home/ocrhub/.cache
       # Uploaded files and every engine's OCR output as JSON, keyed by content
       # hash, in a plain folder you can open: ./data/input and ./data/output
