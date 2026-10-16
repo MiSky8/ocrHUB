@@ -159,3 +159,35 @@ def test_malformed_layout_box_keeps_the_ocr_lines(sample_image_bytes, monkeypatc
     assert result.pages[0].boxes[0].region_type is None
     assert result.pages[0].text == "HELLO"
     assert "layout merge failed on page 1" in caplog.text
+
+
+def _three_line_engine():
+    engine = MagicMock()
+    engine.predict.return_value = [{
+        "rec_texts": ["a", "", "b"],
+        "rec_scores": [0.9, 0.9, 0.9],
+        "rec_polys": [
+            [[10, 10], [60, 10], [60, 30], [10, 30]],
+            [[10, 40], [60, 40], [60, 60], [10, 60]],
+            [[10, 70], [60, 70], [60, 90], [10, 90]],
+        ],
+    }]
+    return engine
+
+
+def test_layout_off_keeps_empty_text_lines_in_page_text(sample_image_bytes, monkeypatch):
+    monkeypatch.delenv("PADDLE_LAYOUT", raising=False)
+    adapter = PaddleOcrAdapter()
+    with patch.object(adapter, "_build_engine", return_value=_three_line_engine()):
+        result = adapter.extract(sample_image_bytes, "s.png")
+    assert result.pages[0].text == "a\n\nb"
+
+
+def test_merge_failure_fallback_keeps_empty_text_lines(sample_image_bytes, monkeypatch):
+    monkeypatch.setenv("PADDLE_LAYOUT", "1")
+    adapter = PaddleOcrAdapter()
+    bad = {"label": "text", "score": None, "coordinate": [0, 0, 200, 60]}
+    with patch.object(adapter, "_build_engine", return_value=_three_line_engine()), \
+         patch.object(adapter, "_build_layout_model", return_value=_layout_model(bad)):
+        result = adapter.extract(sample_image_bytes, "s.png")
+    assert result.pages[0].text == "a\n\nb"

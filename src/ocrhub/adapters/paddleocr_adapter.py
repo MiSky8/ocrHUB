@@ -139,8 +139,11 @@ class PaddleOcrAdapter:
                         i, exc_info=True,
                     )
             if boxes is None:
+                # Plain lines (layout off or failed): same text as before layout existed.
                 boxes = _plain_line_boxes(lines)
-            text = "\n".join(b.text for b in boxes if b.text)
+                text = "\n".join(ln["text"] for ln in lines)
+            else:
+                text = "\n".join(b.text for b in boxes if b.text)
             confidence = sum(confidences) / len(confidences) if confidences else None
 
             png_buf = io.BytesIO()
