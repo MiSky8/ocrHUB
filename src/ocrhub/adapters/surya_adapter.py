@@ -11,6 +11,7 @@ from pathlib import Path
 from PIL import Image
 
 from ocrhub.adapters._text import strip_html
+from ocrhub.imaging import crop_jpeg_b64
 from ocrhub.models import BoxResult, OcrResult, PageResult
 from ocrhub.pdf_utils import is_pdf, rasterize_pdf
 
@@ -63,7 +64,6 @@ _REGION_TYPES = {
 }
 _TABLE_LABELS = frozenset({"Table"})
 _PICTURE_LABELS = frozenset({"Picture", "Figure"})
-_MAX_PICTURE_SIDE = 800
 
 
 def _centre(bbox) -> tuple[float, float]:
@@ -208,21 +208,6 @@ def build_region_boxes(
                       confidence=conf * 100 if conf is not None else None)
         )
     return result
-
-
-def _crop_jpeg_b64(img: Image.Image, bbox) -> str | None:
-    """Region crop as a downscaled base64 JPEG, for the dashboard's picture boxes."""
-    try:
-        x0, y0, x1, y1 = (int(v) for v in bbox)
-        crop = img.convert("RGB").crop((max(x0, 0), max(y0, 0), min(x1, img.width), min(y1, img.height)))
-        if crop.width < 2 or crop.height < 2:
-            return None
-        crop.thumbnail((_MAX_PICTURE_SIDE, _MAX_PICTURE_SIDE))
-        buf = io.BytesIO()
-        crop.save(buf, format="JPEG", quality=70)
-        return base64.b64encode(buf.getvalue()).decode("ascii")
-    except Exception:  # noqa: BLE001 - the crop is a nicety; the region is still reported
-        return None
 
 
 def _layout_enabled() -> bool:
@@ -378,7 +363,7 @@ class SuryaAdapter:
             else:
                 page_regions = regions[i - 1]
                 pictures = {
-                    idx: _crop_jpeg_b64(img, r["bbox"])
+                    idx: crop_jpeg_b64(img, r["bbox"])
                     for idx, r in enumerate(page_regions)
                     if r["label"] in _PICTURE_LABELS
                 }
