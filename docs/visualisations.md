@@ -266,12 +266,22 @@ regions and figure crops (see below). Code:
   `~/.paddlex`, which was not on a volume, so every container recreate
   downloaded the models again.
 - **Tuning (`.env`):** `PADDLE_LAYOUT_MODEL` picks the layout model (default
-  `PP-DocLayout-S`; larger variants such as `PP-DocLayout-L` download on first
-  use). `PADDLE_LAYOUT_THRESHOLD` (0-1, blank = the model's default) is the
-  minimum score for a region. On the cover of `First Impression Formula.pdf`
-  PP-DocLayout-S at its default finds only a `doc_title` and no picture; at
-  0.1 it finds image regions (scores 0.11-0.29) but also dozens of low-score
-  text, title and table boxes. An invalid threshold is logged and ignored.
+  `PP-DocLayout-S`). `PADDLE_LAYOUT_THRESHOLD` (0-1, blank = the model's
+  default) is the minimum score for a region. An invalid threshold is logged
+  and ignored. On the cover of `First Impression Formula.pdf` PP-DocLayout-S at
+  its default finds only a `doc_title` and no picture; run alone at 0.1 it
+  finds image regions (scores 0.11-0.29) but also dozens of low-score text,
+  title and table boxes.
+- **Tested combination:** `PP-DocLayout_plus-L` with `PADDLE_LAYOUT_THRESHOLD=0.4`,
+  one run per file, Docker on aarch64. `First Impression Formula.pdf`: pictures
+  on pages 1 to 3 (cover illustration, card graphic, dancing figures, emoji, the
+  step-number badges on page 2); the logo at the top of each page was not found.
+  `OCR Test Document.pdf`: page 1's sales table as 6 rows of 6 cells in order,
+  page 4's table (12 cells) and chart (one Picture) as with the defaults. The
+  cover illustration scored 0.48 for `plus-L`, just under its 0.5 default
+  cut-off, so it was dropped until the threshold was lowered. The threshold was
+  tuned on that one page. Other models and thresholds were not run through the
+  adapter.
 - **Cached results:** results are cached by file content, so re-run with
   `refresh=true` after upgrading or changing `PADDLE_LAYOUT`,
   `PADDLE_LAYOUT_MODEL` or `PADDLE_LAYOUT_THRESHOLD`.
@@ -310,8 +320,9 @@ regions and figure crops (see below). Code:
     three `text` boxes and no table; page 3 returned one `paragraph_title` and
     one `text` box and no table. So on those pages the layout model itself
     returned no table, and our merge is not dropping any. The cover's raw
-    model output was not checked. Other PP-DocLayout variants might do better;
-    they were not tried.
+    model output was not checked.
+  - `PP-DocLayout_plus-L` with threshold 0.4: see "Tested combination" above.
+  - Other PP-DocLayout variants were not tried through the adapter.
 
 ## Datalab
 

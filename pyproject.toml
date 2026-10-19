@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ocrhub"
-version = "0.1.0"
+version = "0.2.0"
 description = "One Docker image, many OCR engines, one API."
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -38,13 +38,15 @@ dependencies = [
 #
 # numpy<2 is no longer pinned: it was only kept from the old PaddleOCR 2.7.3
 # opencv clash. 0.14.7 was run on NumPy 2.3.5 / Python 3.13 in a conda env
-# (real photo, correct output); the Docker image check is still pending.
+# (real photo, correct output), and in the Docker image (aarch64, Python 3.11,
+# NumPy 2.3.5).
 surya = ["surya-ocr==0.14.7"]
 # Written against paddleocr 3.x (predict() API, PP-OCRv6 models), checked in a
 # local conda env (paddleocr 3.7.0, paddlepaddle 3.3.1, numpy 2.3.5). The Linux
 # wheels on PyPI stop at paddlepaddle 3.2.2, hence the 3.2 floor. PaddleOCR
-# alone was also run in the Docker image (ENGINES=paddleocr); PaddleOCR next to
-# Surya in one image was not tried. The old 2.7.3 pins forced opencv 4.6 /
+# alone was also run in the Docker image (ENGINES=paddleocr), and next to Surya
+# and Datalab in one image (ENGINES=surya,paddleocr,datalab, aarch64) with
+# pymupdf<2 (see the base dependencies). The old 2.7.3 pins forced opencv 4.6 /
 # numpy<2; 3.x doesn't.
 paddleocr = ["paddleocr>=3.7,<4", "paddlepaddle>=3.2,<4"]
 # brotlicffi: Datalab's API responses are Brotli-encoded; the SDK's aiohttp

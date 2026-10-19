@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (2026-10-19)
 
 - Pinned `pymupdf` below 2.0. With PyMuPDF 2.0 in the Docker image (aarch64),
   rendering a PDF and then building PaddleOCR's models segfaulted the whole
@@ -10,8 +10,13 @@
   tagged `Table`, in row order, instead of one box whose text was scrambled
   (cells on one row differ by a few pixels in `y0`).
 - New `.env` settings `PADDLE_LAYOUT_MODEL` (default `PP-DocLayout-S`) and
-  `PADDLE_LAYOUT_THRESHOLD` (blank = the model's default). Only the defaults
-  have been tested. Re-run with `refresh=true` after changing them.
+  `PADDLE_LAYOUT_THRESHOLD` (blank = the model's default). Tested: the defaults,
+  and `PP-DocLayout_plus-L` with `0.4`, which found pictures the default model
+  missed on `First Impression Formula.pdf` (see the README). Other values are
+  untested. Re-run with `refresh=true` after changing them.
+- Surya, PaddleOCR and Datalab now run together in one image (checked on
+  aarch64 Docker); the notes that this was untried are gone. Not run on amd64 or
+  a native Linux host.
 - Datalab reports itself available only when its SDK is installed, not just
   when an API key is set.
 - README: a Settings (`.env`) table listing every variable, its default and

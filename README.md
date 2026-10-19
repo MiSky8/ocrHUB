@@ -119,9 +119,32 @@ change a model setting, run a real file through the container and compare.
 | `SURYA_LAYOUT` | `1` | `0` skips Surya's layout and table models: plain lines, faster, less memory. |
 | `SURYA_LAYOUT_BATCH_SIZE`, `SURYA_TABLE_REC_BATCH_SIZE` | `2` | Batch sizes for those two models. Lower to save memory. |
 | `PADDLE_LAYOUT` | `0` | `1` runs a layout model after PaddleOCR's text recognition, giving typed regions (Title, Text, Table, Picture...) and figure crops. Off, PaddleOCR returns plain line boxes with no pictures. |
-| `PADDLE_LAYOUT_MODEL` | `PP-DocLayout-S` | Which PaddleOCR layout model to use, any PP-DocLayout name PaddleOCR supports (for example `PP-DocLayout-L`). Larger models may find more figures but are slower and use more memory. Downloads on first use. Only used when `PADDLE_LAYOUT=1`. **Only `PP-DocLayout-S` has been tested here;** try another on your own files first. |
-| `PADDLE_LAYOUT_THRESHOLD` | blank (the model's default) | Minimum score, 0 to 1, for a layout region to be kept. Lower it if figures are missed; expect false regions too. Invalid values are logged and ignored. Only used when `PADDLE_LAYOUT=1`. **Only the default has been tested here;** lower values add false regions (see `docs/visualisations.md`). |
+| `PADDLE_LAYOUT_MODEL` | `PP-DocLayout-S` | Which PaddleOCR layout model to load. Tested: `PP-DocLayout-S` (the default) and `PP-DocLayout_plus-L` (see "Tested PaddleOCR layout settings" below). Any other name is passed to PaddleOCR unchanged and is unverified. Only used when `PADDLE_LAYOUT=1`. |
+| `PADDLE_LAYOUT_THRESHOLD` | blank (the model's default) | Minimum score, 0 to 1, for a layout region to be kept. Tested: blank, and `0.4` together with `PP-DocLayout_plus-L`. Invalid values are logged and ignored. Only used when `PADDLE_LAYOUT=1`. |
 | `OCRHUB_DATA_DIR` | `./data` | Folder for uploaded files and cached results (see "Your results"). |
+
+### Tested PaddleOCR layout settings
+
+With `PADDLE_LAYOUT=1`, on two PDFs, one run each, in the Docker image (aarch64,
+all of Surya, PaddleOCR and Datalab installed):
+
+| Settings | `First Impression Formula.pdf` | `OCR Test Document.pdf` |
+|---|---|---|
+| `PP-DocLayout-S`, threshold blank (the defaults) | no picture on any page; the cover illustration was not found | tables as row-ordered cell boxes, chart as a Picture on page 4 |
+| `PP-DocLayout_plus-L`, threshold `0.4` | pictures on pages 1 to 3 (the cover illustration, the card graphic, the dancing figures, the emoji and the step-number badges); the logo at the top of each page is not found | page 1's sales table comes back as 6 rows of 6 cells in order; page 4's table and chart as with the defaults |
+
+```bash
+PADDLE_LAYOUT=1
+PADDLE_LAYOUT_MODEL=PP-DocLayout_plus-L
+PADDLE_LAYOUT_THRESHOLD=0.4
+```
+
+Why `0.4`: at its default cut-off the larger model scored the cover illustration
+0.48, just under the 0.5 default, and dropped it. This was tuned on one page, so
+other documents may need a different value. A lower threshold can add boxes that
+are not pictures. Restart with `docker compose up -d` after changing these, and
+re-run files with `refresh=true`: cached results keep the old output. The
+settings were not run on amd64 or a native Linux host.
 
 ## Using it
 
@@ -217,9 +240,8 @@ tests on a Docker Desktop Mac (8 GB limit), so treat them as rough:
   4-page PDF it made no measurable difference to time or memory (see
   `docs/visualisations.md`). It misses some figures and tables, and orders regions top to bottom then left to
   right. `/engines` reports each engine's `capabilities`, and the dashboard says
-  "No figure detection" for engines without Picture (the dashboard rendering
-  of that note and of the PaddleOCR region boxes has not been checked
-  visually yet). Re-run with
+  "No figure detection" for engines without Picture (checked in the dashboard on
+  `OCR Test Document.pdf`: the note, the table cells and the picture box). Re-run with
   `refresh=true` after changing it: cached results keep the old output.
 - **Images** are normalised before any engine sees them: EXIF rotation applied,
   flattened to RGB, longest side capped at 3000 px, re-encoded as PNG. The
