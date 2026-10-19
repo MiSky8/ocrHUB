@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Pinned `pymupdf` below 2.0. With PyMuPDF 2.0 in the Docker image (aarch64),
+  rendering a PDF and then building PaddleOCR's models segfaulted the whole
+  server, so every engine showed "Load failed". PyMuPDF 1.28.2 works. Rebuild
+  the image after pulling this (it reinstalls the packages).
+- PaddleOCR with `PADDLE_LAYOUT=1`: lines in a Table region stay separate boxes
+  tagged `Table`, in row order, instead of one box whose text was scrambled
+  (cells on one row differ by a few pixels in `y0`).
+- New `.env` settings `PADDLE_LAYOUT_MODEL` (default `PP-DocLayout-S`) and
+  `PADDLE_LAYOUT_THRESHOLD` (blank = the model's default). Only the defaults
+  have been tested. Re-run with `refresh=true` after changing them.
+- Datalab reports itself available only when its SDK is installed, not just
+  when an API key is set.
+- README: a Settings (`.env`) table listing every variable, its default and
+  whether changing it needs a rebuild.
 - PaddleOCR layout regions and figure crops with `PADDLE_LAYOUT=1` (PP-DocLayout-S);
   `/engines` reports capabilities; dashboard labels engines without figure
   detection. Re-run with `refresh=true` after upgrading: cached results keep the

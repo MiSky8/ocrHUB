@@ -17,7 +17,10 @@ dependencies = [
     "pytesseract>=0.3.10",
     "Pillow>=10.1",
     "pdfplumber>=0.11",
-    "pymupdf>=1.24",
+    # <2: PyMuPDF 2.0 pulls in pymupdf4llm, pymupdf-layout and onnxruntime, and in the
+    # Docker image (aarch64) rendering a PDF with it and then building PaddleOCR's
+    # models segfaults the whole process. 1.28.2 is fine.
+    "pymupdf>=1.24,<2",
     "httpx>=0.27",
     "mcp>=2.2,<3",
 ]
