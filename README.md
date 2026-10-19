@@ -96,6 +96,33 @@ Surya's models; without it they are downloaded again for every new container.)
 To see what the app is doing (engine progress, errors, model downloads), run
 `docker compose logs -f ocrhub` in a second terminal.
 
+## Settings (`.env`)
+
+Copy `.env.example` to `.env` and uncomment what you want to change. `.env` is
+gitignored; keep `.env.example` listing every variable. Only `ENGINES` changes
+what is installed, so only it needs a rebuild (`docker compose up -d --build`).
+The rest take effect with `docker compose up -d`. Results are cached by file
+content, so after changing a setting that affects output, re-run the file with
+`refresh=true` (or delete its `data/output/<hash>/<engine>.json`). The unit tests mock the
+models, so they don't check any of these values against real output: when you
+change a model setting, run a real file through the container and compare.
+
+| Variable | Default | What it does and when to change it |
+|---|---|---|
+| `ENGINES` | blank (Tesseract and pdfplumber only) | Optional engines to install: any of `surya`, `paddleocr`, `datalab`, comma-separated. Rebuild after changing. Each adds install time and disk. |
+| `DATALAB_API_KEY` | blank (Datalab off) | Enables the hosted Datalab engine. Paid, with a free monthly tier. |
+| `DATALAB_MODE` | `accurate` | Datalab's processing mode, passed to its API as is. **Only `accurate` has been tested here;** check any other value against Datalab's docs and your own files. |
+| `DATALAB_TIMEOUT` | `600` | Seconds to wait for a Datalab result. Raise it for large files. |
+| `DATALAB_BASE_URL` | `https://www.datalab.to` | Only for a self-hosted or proxied Datalab endpoint. |
+| `SURYA_RECOGNITION_BATCH_SIZE` | `8` | Lines Surya recognises at once. Lower it if the container is OOM-killed (slower, less memory). |
+| `SURYA_DETECTOR_BATCH_SIZE` | `1` | Same trade-off for Surya's detector. |
+| `SURYA_LAYOUT` | `1` | `0` skips Surya's layout and table models: plain lines, faster, less memory. |
+| `SURYA_LAYOUT_BATCH_SIZE`, `SURYA_TABLE_REC_BATCH_SIZE` | `2` | Batch sizes for those two models. Lower to save memory. |
+| `PADDLE_LAYOUT` | `0` | `1` runs a layout model after PaddleOCR's text recognition, giving typed regions (Title, Text, Table, Picture...) and figure crops. Off, PaddleOCR returns plain line boxes with no pictures. |
+| `PADDLE_LAYOUT_MODEL` | `PP-DocLayout-S` | Which PaddleOCR layout model to use, any PP-DocLayout name PaddleOCR supports (for example `PP-DocLayout-L`). Larger models may find more figures but are slower and use more memory. Downloads on first use. Only used when `PADDLE_LAYOUT=1`. **Only `PP-DocLayout-S` has been tested here;** try another on your own files first. |
+| `PADDLE_LAYOUT_THRESHOLD` | blank (the model's default) | Minimum score, 0 to 1, for a layout region to be kept. Lower it if figures are missed; expect false regions too. Invalid values are logged and ignored. Only used when `PADDLE_LAYOUT=1`. **Only the default has been tested here;** lower values add false regions (see `docs/visualisations.md`). |
+| `OCRHUB_DATA_DIR` | `./data` | Folder for uploaded files and cached results (see "Your results"). |
+
 ## Using it
 
 **The dashboard** at <http://localhost:8000>: upload an image or PDF, tick the
@@ -184,9 +211,9 @@ tests on a Docker Desktop Mac (8 GB limit), so treat them as rough:
   regions, reading order and tables. They cost some time and memory. Set
   `SURYA_LAYOUT=0` in `.env` to skip them and get plain lines.
 - **PaddleOCR's layout stage** is off by default. `PADDLE_LAYOUT=1` in `.env`
-  runs PP-DocLayout-S (change it with `PADDLE_LAYOUT_MODEL`, tune its score
-  cut-off with `PADDLE_LAYOUT_THRESHOLD`) after recognition and returns typed regions (Title, Text,
-  Table, Picture...) and figure crops. It adds one small model download; on one
+  runs a layout model (PP-DocLayout-S by default; see "Settings" for the model
+  and threshold variables) after recognition and returns typed regions (Title,
+  Text, Table, Picture...) and figure crops. It adds one small model download; on one
   4-page PDF it made no measurable difference to time or memory (see
   `docs/visualisations.md`). It misses some figures and tables, and orders regions top to bottom then left to
   right. `/engines` reports each engine's `capabilities`, and the dashboard says
