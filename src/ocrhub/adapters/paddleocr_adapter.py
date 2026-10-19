@@ -20,6 +20,25 @@ def _layout_enabled() -> bool:
     return os.environ.get("PADDLE_LAYOUT", "0").strip().lower() in ("1", "true", "yes", "on")
 
 
+def _layout_model_name() -> str:
+    return os.environ.get("PADDLE_LAYOUT_MODEL", "").strip() or LAYOUT_MODEL
+
+
+def _layout_threshold() -> float | None:
+    """PADDLE_LAYOUT_THRESHOLD as a 0-1 score cut-off; None (model default) if unset or invalid."""
+    raw = os.environ.get("PADDLE_LAYOUT_THRESHOLD", "").strip()
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        value = -1.0
+    if not 0.0 <= value <= 1.0:
+        logger.warning("Ignoring PADDLE_LAYOUT_THRESHOLD=%r: expected a number from 0 to 1", raw)
+        return None
+    return value
+
+
 def _free_memory() -> None:
     gc.collect()
 
@@ -65,7 +84,7 @@ class PaddleOcrAdapter:
     def _build_layout_model(self):
         from paddleocr import LayoutDetection
 
-        return LayoutDetection(model_name=LAYOUT_MODEL)
+        return LayoutDetection(model_name=_layout_model_name())
 
     def _detect_layouts(self, page_images: list[bytes]) -> list[list[dict]] | None:
         """Layout boxes per page, or None if the layout stage failed (OCR lines are kept)."""
@@ -74,10 +93,12 @@ class PaddleOcrAdapter:
         model = None
         try:
             model = self._build_layout_model()
+            threshold = _layout_threshold()
+            options = {} if threshold is None else {"threshold": threshold}
             layouts = []
             for page_bytes in page_images:
                 img = Image.open(io.BytesIO(page_bytes)).convert("RGB")
-                [res] = model.predict(np.array(img))
+                [res] = model.predict(np.array(img), **options)
                 layouts.append(list(res["boxes"]))
             return layouts
         except Exception:  # noqa: BLE001 - good OCR lines must survive a layout failure

@@ -101,3 +101,15 @@ def test_no_regions_returns_plain_line_boxes():
     boxes = merge_layout([line("a", 0, 0, 10, 10), line("b", 0, 20, 10, 30)], [], IMG)
     assert [b.text for b in boxes] == ["a", "b"]
     assert all(b.region_type is None for b in boxes)
+
+
+def test_table_lines_stay_separate_boxes_in_row_order():
+    # Cells on one row differ by a few px in y0; a plain (y0, x0) sort scrambles them.
+    lines = [
+        line("NAME", 200, 100, 300, 120), line("ID", 10, 103, 60, 123), line("AMOUNT", 400, 101, 500, 121),
+        line("0001", 10, 150, 60, 170), line("Alpha", 200, 148, 300, 168), line("1,250.00", 400, 152, 500, 172),
+    ]
+    boxes = merge_layout(lines, [region("table", 0, 90, 600, 200)], IMG)
+    assert [b.text for b in boxes] == ["ID", "NAME", "AMOUNT", "0001", "Alpha", "1,250.00"]
+    assert all(b.region_type == "Table" for b in boxes)
+    assert [b.reading_order for b in boxes] == list(range(6))

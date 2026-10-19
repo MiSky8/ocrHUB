@@ -246,8 +246,11 @@ regions and figure crops (see below). Code:
   `table` and `formula` give Header, Footer, Table and Formula; `image`, `chart`
   and `seal` give Picture. Other labels (page and formula numbers) are ignored,
   so their lines stay plain.
-- **Tables** are regions with their lines inside. There is no cell grid and no
-  html, unlike Surya and Datalab.
+- **Tables:** PaddleOCR finds no cells, so a Table region is not drawn as one
+  box. Each line inside it stays its own box, tagged `Table`, ordered by row
+  (lines on one row left to right) instead of by raw `y0`, which scrambled
+  cells whose tops differ by a few pixels. There is no cell grid and no html,
+  unlike Surya and Datalab.
 - **Reading order:** the layout model gives none, so regions and leftover lines
   are ordered top to bottom, then left to right. Multi-column pages will be
   misordered.
@@ -262,8 +265,16 @@ regions and figure crops (see below). Code:
   `ocrhub-models` volume. Before that setting, PaddleX cached in
   `~/.paddlex`, which was not on a volume, so every container recreate
   downloaded the models again.
+- **Tuning (`.env`):** `PADDLE_LAYOUT_MODEL` picks the layout model (default
+  `PP-DocLayout-S`; larger variants such as `PP-DocLayout-L` download on first
+  use). `PADDLE_LAYOUT_THRESHOLD` (0-1, blank = the model's default) is the
+  minimum score for a region. On the cover of `First Impression Formula.pdf`
+  PP-DocLayout-S at its default finds only a `doc_title` and no picture; at
+  0.1 it finds image regions (scores 0.11-0.29) but also dozens of low-score
+  text, title and table boxes. An invalid threshold is logged and ignored.
 - **Cached results:** results are cached by file content, so re-run with
-  `refresh=true` after upgrading or toggling `PADDLE_LAYOUT`.
+  `refresh=true` after upgrading or changing `PADDLE_LAYOUT`,
+  `PADDLE_LAYOUT_MODEL` or `PADDLE_LAYOUT_THRESHOLD`.
 - **Time and memory (one file, the 4-page `OCR Test Document.pdf`, CPU, in
   Docker; two runs per setting, one right after a container recreate and one
   warm):** the warm runs took 160 s with layout on and 159 s with it off; the

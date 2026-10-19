@@ -191,3 +191,43 @@ def test_merge_failure_fallback_keeps_empty_text_lines(sample_image_bytes, monke
          patch.object(adapter, "_build_layout_model", return_value=_layout_model(bad)):
         result = adapter.extract(sample_image_bytes, "s.png")
     assert result.pages[0].text == "a\n\nb"
+
+
+def test_layout_model_name_defaults_and_can_be_overridden(monkeypatch):
+    monkeypatch.delenv("PADDLE_LAYOUT_MODEL", raising=False)
+    assert paddleocr_adapter._layout_model_name() == "PP-DocLayout-S"
+    monkeypatch.setenv("PADDLE_LAYOUT_MODEL", " PP-DocLayout-L ")
+    assert paddleocr_adapter._layout_model_name() == "PP-DocLayout-L"
+    monkeypatch.setenv("PADDLE_LAYOUT_MODEL", "")
+    assert paddleocr_adapter._layout_model_name() == "PP-DocLayout-S"
+
+
+@pytest.mark.parametrize("raw, expected", [("", None), ("0.3", 0.3), (" 0 ", 0.0), ("1", 1.0)])
+def test_layout_threshold_parses(monkeypatch, raw, expected):
+    monkeypatch.setenv("PADDLE_LAYOUT_THRESHOLD", raw)
+    assert paddleocr_adapter._layout_threshold() == expected
+
+
+@pytest.mark.parametrize("raw", ["abc", "-0.1", "1.5", "nan"])
+def test_invalid_layout_threshold_is_ignored_with_a_warning(monkeypatch, caplog, raw):
+    monkeypatch.setenv("PADDLE_LAYOUT_THRESHOLD", raw)
+    assert paddleocr_adapter._layout_threshold() is None
+    assert "PADDLE_LAYOUT_THRESHOLD" in caplog.text
+
+
+def test_layout_threshold_is_passed_to_the_layout_model_only_when_set(sample_image_bytes, monkeypatch):
+    monkeypatch.setenv("PADDLE_LAYOUT", "1")
+    adapter = paddleocr_adapter.PaddleOcrAdapter()
+    layout = _layout_model()
+    monkeypatch.setenv("PADDLE_LAYOUT_THRESHOLD", "0.2")
+    with patch.object(adapter, "_build_engine", return_value=_ocr_engine()), \
+         patch.object(adapter, "_build_layout_model", return_value=layout):
+        adapter.extract(sample_image_bytes, "sample.png")
+    assert layout.predict.call_args.kwargs == {"threshold": 0.2}
+
+    layout = _layout_model()
+    monkeypatch.delenv("PADDLE_LAYOUT_THRESHOLD")
+    with patch.object(adapter, "_build_engine", return_value=_ocr_engine()), \
+         patch.object(adapter, "_build_layout_model", return_value=layout):
+        adapter.extract(sample_image_bytes, "sample.png")
+    assert layout.predict.call_args.kwargs == {}

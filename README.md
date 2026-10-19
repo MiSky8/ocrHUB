@@ -184,7 +184,8 @@ tests on a Docker Desktop Mac (8 GB limit), so treat them as rough:
   regions, reading order and tables. They cost some time and memory. Set
   `SURYA_LAYOUT=0` in `.env` to skip them and get plain lines.
 - **PaddleOCR's layout stage** is off by default. `PADDLE_LAYOUT=1` in `.env`
-  runs PP-DocLayout-S after recognition and returns typed regions (Title, Text,
+  runs PP-DocLayout-S (change it with `PADDLE_LAYOUT_MODEL`, tune its score
+  cut-off with `PADDLE_LAYOUT_THRESHOLD`) after recognition and returns typed regions (Title, Text,
   Table, Picture...) and figure crops. It adds one small model download; on one
   4-page PDF it made no measurable difference to time or memory (see
   `docs/visualisations.md`). It misses some figures and tables, and orders regions top to bottom then left to

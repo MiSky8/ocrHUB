@@ -9,6 +9,7 @@ from ocrhub.models import BoxResult
 
 LAYOUT_MODEL = "PP-DocLayout-S"
 PICTURE = "Picture"
+TABLE = "Table"
 
 # PP-DocLayout label -> the region_type names the dashboard already uses.
 # Labels not listed (page numbers, formula numbers) are ignored and their lines
@@ -68,13 +69,33 @@ def _line_key(ln: dict):
     return (ln["bbox"][1], ln["bbox"][0])
 
 
-def _line_box(ln: dict, order: int) -> BoxResult:
+def _row_order(lines: list[dict]) -> list[dict]:
+    """Top-to-bottom rows, left to right within a row.
+
+    A plain (y0, x0) sort splits a table row apart: cells on one row differ by a
+    few pixels in y0, so the sort orders them by that jitter instead of by column.
+    A line joins the current row when its centre lies inside the row's first line.
+    """
+    rows: list[list[dict]] = []
+    row_span = (0.0, 0.0)
+    for ln in sorted(lines, key=_line_key):
+        cy = (ln["bbox"][1] + ln["bbox"][3]) / 2
+        if rows and row_span[0] <= cy <= row_span[1]:
+            rows[-1].append(ln)
+        else:
+            rows.append([ln])
+            row_span = (ln["bbox"][1], ln["bbox"][3])
+    return [ln for row in rows for ln in sorted(row, key=lambda ln: ln["bbox"][0])]
+
+
+def _line_box(ln: dict, order: int, region_type: str | None = None) -> BoxResult:
     x0, y0, x1, y1 = ln["bbox"]
     conf = ln["confidence"]
     return BoxResult(
         text=ln["text"], x0=x0, y0=y0, x1=x1, y1=y1,
         confidence=conf * 100 if conf is not None else None,
         reading_order=order,
+        region_type=region_type,
     )
 
 
@@ -108,6 +129,12 @@ def merge_layout(lines: list[dict], layout_boxes: list[dict], image: Image.Image
     boxes: list[BoxResult] = []
     for i in sorted(range(len(regions)), key=lambda i: (regions[i]["bbox"][1], regions[i]["bbox"][0])):
         r = regions[i]
+        if r["type"] == TABLE:
+            # PaddleOCR finds no cells, so one joined box would hide the rows.
+            # Keep each line as its own box, tagged Table, in row order.
+            for ln in _row_order(owned[i]):
+                boxes.append(_line_box(ln, len(boxes), TABLE))
+            continue
         inside = sorted(owned[i], key=_line_key)
         if r["type"] != PICTURE and not inside:
             continue

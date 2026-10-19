@@ -29,6 +29,10 @@ services:
       # Off by default: adds one small model download. Measured on one 4-page PDF,
       # no difference in time or memory (160 s vs 159 s warm).
       - PADDLE_LAYOUT=${PADDLE_LAYOUT:-0}
+      # Which layout model to load (default PP-DocLayout-S) and the minimum
+      # score for a region to be kept (blank = the model's own default).
+      - PADDLE_LAYOUT_MODEL=${PADDLE_LAYOUT_MODEL:-}
+      - PADDLE_LAYOUT_THRESHOLD=${PADDLE_LAYOUT_THRESHOLD:-}
       # PaddleX defaults to ~/.paddlex, which is not on a volume, so every
       # container recreate re-downloaded the PaddleOCR models.
       - PADDLE_PDX_CACHE_HOME=/home/ocrhub/.cache/paddlex
